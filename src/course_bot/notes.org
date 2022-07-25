@@ -1,0 +1,28 @@
+#+title: Notes
+
+* Scraping
+** page
+#+begin_src clojure
+(def csse1001
+  (html-resource (URL. "https://my.uq.edu.au/programs-courses/course.html?course_code=CSSE1001")))
+#+end_src
+** Course profile link
+#+begin_src clojure
+(mapcat #(attr-values % :href) (select csse1001 [:table#course-current-offerings :tbody :td.course-offering-profile :a]))
+#+end_src
+** Course year
+#+begin_src clojure
+(select csse1001 [:table#course-current-offerings :tbody :a.course-offering-year content])
+#+end_src
+** Course location
+#+begin_src clojure
+(select csse1001 [:table#course-current-offerings :tbody :td.course-offering-location content])
+#+end_src
+** Course mode
+#+begin_src clojure
+(select csse1001 [:table#course-current-offerings :tbody :td.course-offering-mode :a content])
+#+end_src
+** Course description
+#+begin_src clojure
+(select csse1001 [:#course-summary content])
+#+end_src

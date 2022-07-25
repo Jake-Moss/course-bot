@@ -5,7 +5,9 @@
   :dependencies [[org.clojure/clojure "1.10.1"]
                  [com.github.discljord/discljord "1.3.1"]
                  [com.brunobonacci/mulog "0.8.1"]
-                 [com.github.johnnyjayjay/slash "0.5.0-SNAPSHOT"]]
+                 [enlive "1.1.6"]
+                 [com.github.johnnyjayjay/slash "0.5.0-SNAPSHOT"]
+                 [clj-tagsoup/clj-tagsoup "0.3.0"]]
   :repl-options {:init-ns course-bot.core}
   :plugins [[lein-cljfmt "0.8.0"]]
   :main course-bot.core)
