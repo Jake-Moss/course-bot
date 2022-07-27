@@ -4,21 +4,15 @@
             [discljord.messaging :as d-rest]
             [discljord.connections :as d-conn]
             [discljord.events :as d-event]
+            [discljord.permissions :as d-perms]
 
             [slash.core :refer [route-interaction]]
             [slash.gateway :refer [gateway-defaults wrap-response-return]]
-
-            [com.brunobonacci.mulog :as u]
 
             [course-bot.state :as state]
             [course-bot.paths :as path]
             [course-bot.commands :refer [commands]]
             [clojure.edn :as edn]))
-
-(defonce logger (u/start-publisher! {:type :multi
-                                     :publishers [{:type :console}
-                                                  {:type :simple-file
-                                                   :filename "./logs/mulog.log"}]}))
 
 
 (defn start-bot! [token _]
@@ -57,6 +51,17 @@
 
 ;; @state/course-map
 ;; @state/state
+
+;; @(d-rest/create-message! (:rest @state/state) "938313279250530394" :content "sheesh")
+;; @(d-rest/create-guild-role! (:rest @state/state) state/guild-id :name "a-cool-role-for-cool-people")
+;; @(d-rest/create-guild-channel! (:rest @state/state) state/guild-id "neat-things" :type 4)
+;; @(d-rest/create-guild-channel! (:rest @state/state) state/guild-id "neat-text-chat" :type 0 :parent-id "1001819269400625184"
+;;                                :permission-overwrites
+;;                                [{:id "1001828872108642464" :type :role :allow (:view-channel d-perms/permissions-bit)}
+;;                                 {:id state/guild-id :type :role :deny (:view-channel d-perms/permissions-bit)}])
+;; @(d-rest/add-guild-member-role! (:rest @state/state) state/guild-id "312446652570927106" "1001828872108642464")
+
+;; (bit-shift-left 1 10)
 
 ;; (def bot (future (-main)))
 ;; (future-cancel bot)

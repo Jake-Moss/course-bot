@@ -1,10 +1,11 @@
 (ns course-bot.handlers
   (:require [clojure.string :as str]
             [discljord.formatting :as d-format]
+            [discljord.messaging :as d-rest]
             [slash.command :as cmd]
             [slash.command.structure :as scs]
             [slash.response :as rsp]
-            [course-bot.state :refer [course-map]]
+            [course-bot.state :as state]
             [course-bot.bar :refer [score-graph]]))
 
 ;;; fun
@@ -30,17 +31,21 @@
 ;;; course
 (cmd/defhandler course
   ["register"]
-  _
+  {{{user-id :id} :user} :member} ; Using the interaction binding to get the user who ran the comma
   [input]
 
   (defn update-or-assoc [map value]
     (update map value (fnil inc 0)))
 
   (let [input (str/upper-case input)]
-    (if (re-matches #"[A-Za-z]{4}?\d{4}?" input)
-      (rsp/channel-message
-       {:content (str "Registered " input " to map, now has count "
-                      (get (swap! course-map update-or-assoc input) input))})
+    (if (re-matches #"[A-Z]{4}\d{4}" input)
+      (do
+        (when-not (get @state/course-map input)
+          (d-rest/create-guild-role! (:rest @state/state) state/guild-id :name input)
+          (d-rest/add-guild-member-role! (:rest @state/state) state/guild-id user-id "1001828872108642464"))
+        (rsp/channel-message
+         {:content (str "Registered " input " to map, now has count "
+                        (get (swap! state/course-map update-or-assoc input) input))}))
       (-> (rsp/channel-message
            {:content (str input " is not a valid course code.")})
           rsp/ephemeral))))
@@ -51,7 +56,7 @@
   [input]
   (let [input (str/upper-case input)]
     (rsp/autocomplete-result
-     (->> (keys @course-map)
+     (->> (keys @state/course-map)
           (filter #(str/starts-with? % input))
           (#(conj %1 input)) ;; Add user input as first element
           (map #(array-map :name %1, :value %1))
@@ -63,7 +68,7 @@
   ["reset"]
   _
   _
-  (reset! course-map {})
+  (reset! state/course-map {})
   (-> (rsp/channel-message
        {:content "Reset all course interests."})
       rsp/ephemeral))
@@ -78,7 +83,7 @@
   ["clean"]
   _
   [threshold]
-  (swap! course-map (partial filter-vals #(not (< % threshold))))
+  (swap! state/course-map (partial filter-vals #(not (< % threshold))))
   (-> (rsp/channel-message
        {:content (str "Removed all courses with less than " threshold " interested.")})
       rsp/ephemeral))
@@ -87,7 +92,7 @@
   ["set-interest"]
   _
   [course n]
-  (swap! course-map (fn [old] (assoc old course n)))
+  (swap! state/course-map (fn [old] (assoc old course n)))
   (-> (rsp/channel-message
        {:content (str "Updated interest of " course " to " n ".")})
       rsp/ephemeral))
@@ -97,14 +102,14 @@
   _
   _
   (-> (rsp/channel-message
-       {:content (str @course-map)})
+       {:content (str @state/course-map)})
       rsp/ephemeral))
 
 (cmd/defhandler chart
   ["chart"]
   _
   _
-  (rsp/channel-message {:content (d-format/code-block (score-graph @course-map))}))
+  (rsp/channel-message {:content (d-format/code-block (score-graph @state/course-map))}))
 
 (cmd/defhandler ping
   ["ping"]
