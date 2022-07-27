@@ -6,7 +6,9 @@
 
 (def bot-id (atom nil))
 
-(def config (edn/read-string (slurp "config.edn")))
+(def config (merge
+             (edn/read-string (slurp "config.edn"))
+             (edn/read-string (slurp "token.edn"))))
 
 (def app-id (:application-id config))
 
