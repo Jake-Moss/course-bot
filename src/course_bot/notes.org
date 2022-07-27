@@ -26,3 +26,8 @@
 #+begin_src clojure
 (select csse1001 [:#course-summary content])
 #+end_src
+
+* Discljord
+#+begin_src clojure
+(d-rest/create-message! (:rest @state/state) "938313279250530394" :content "sheesh")
+#+end_src

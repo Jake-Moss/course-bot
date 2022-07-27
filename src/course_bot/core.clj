@@ -8,19 +8,20 @@
             [slash.core :refer [route-interaction]]
             [slash.gateway :refer [gateway-defaults wrap-response-return]]
 
-            ;; [com.brunobonacci.mulog :as u]
+            [com.brunobonacci.mulog :as u]
 
             [course-bot.state :as state]
             [course-bot.paths :as path]
-            [course-bot.commands :refer [commands]]))
+            [course-bot.commands :refer [commands]]
+            [clojure.edn :as edn]))
 
-;; (defonce logger (u/start-publisher! {:type :multi
-;;                                      :publishers [{:type :console}
-;;                                                   {:type :simple-file
-;;                                                    :filename "./logs/mulog.log"}]}))
+(defonce logger (u/start-publisher! {:type :multi
+                                     :publishers [{:type :console}
+                                                  {:type :simple-file
+                                                   :filename "./logs/mulog.log"}]}))
 
 
-(defn start-bot! [token & intents]
+(defn start-bot! [token _]
   (let [event-channel (async/chan 100)
         gateway-connection (d-conn/connect-bot! token event-channel :intents #{})
         rest-connection (d-rest/start-connection! token)
@@ -43,19 +44,19 @@
 
 
 (defn -main [& args]
-  (reset! state/state (start-bot! (:token state/config) :guild-messages))
+  (reset! state/state (start-bot! (:token state/config) #{:guild-messages}))
   (reset! state/bot-id (:id @(d-rest/get-current-user! (:rest @state/state))))
-  (reset! state/course-map {})
-  ;; (reset! state/save-future (future
-  ;;                             (loop []
-  ;;                               (state/save state/config)
-  ;;                               (Thread/sleep (* (:save-period state/config) 1000))
-  ;;                               (recur))))
+  (reset! state/course-map (edn/read-string (slurp "course-list.edn")))
   (try
     (d-rest/bulk-overwrite-guild-application-commands! (:rest @state/state) state/app-id state/guild-id commands)
     (d-event/message-pump! (:events @state/state)
                            (partial d-event/dispatch-handlers
                                     {:interaction-create [#((:handler @state/state) %2)]}))
     (finally
-      (stop-bot! @state/state)
-      (future-cancel @state/save-future))))
+      (stop-bot! @state/state))))
+
+;; @state/course-map
+;; @state/state
+
+;; (def bot (future (-main)))
+;; (future-cancel bot)
