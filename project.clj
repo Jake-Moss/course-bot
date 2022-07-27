@@ -4,7 +4,6 @@
             :url "https://www.eclipse.org/legal/epl-2.0/"}
   :dependencies [[org.clojure/clojure "1.10.1"]
                  [com.github.discljord/discljord "1.3.1"]
-                 [com.brunobonacci/mulog "0.8.1"]
                  [enlive "1.1.6"]
                  [com.github.johnnyjayjay/slash "0.5.0-SNAPSHOT"]]
   :repl-options {:init-ns course-bot.core}
