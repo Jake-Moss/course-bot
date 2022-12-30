@@ -28,10 +28,18 @@
 (defn score-graph [course-map]
   (if (empty? course-map)
     "No courses registered."
-    (let [max-count (apply max (map (comp :count :courses) (vals course-map)))
-          max-code-length (apply max (map count (keys course-map)))]
-      (->> (sort-by (comp :count :courses val) > course-map)
-           (#(map vector (keys %) (map (comp :count :courses) (vals %))))
-           (map #(display 50 max-code-length max-count %))
+    (let [counts (->> (vals course-map)
+                      (map :courses)
+                      (apply merge)
+                      (sort-by (comp :count val) >)
+                      (map (fn [[k {c :count}]]
+                             [k c])))
+          max-count (apply max (map second counts))
+          max-code-length (->> (vals course-map)
+                               (map (comp keys :courses))
+                               flatten
+                               (map count)
+                               (apply max))]
+      (->> (map #(display 50 max-code-length max-count %) counts)
            (string/join "\n")
            (#(str % "\nTotal: " max-count))))))
