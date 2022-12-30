@@ -40,7 +40,8 @@
 (defn -main [& args]
   (reset! state/state (start-bot! (:token state/config) #{:guild-messages}))
   (reset! state/bot-id (:id @(d-rest/get-current-user! (:rest @state/state))))
-  (reset! state/course-map (edn/read-string (slurp "course-list.edn")))
+  (reset! state/course-map (edn/read-string (slurp (:save-filename state/config))))
+  (reset! state/charts (edn/read-string (slurp "charts.edn")))
   (try
     (d-rest/bulk-overwrite-guild-application-commands! (:rest @state/state) state/app-id state/guild-id commands)
     (d-event/message-pump! (:events @state/state)
@@ -49,19 +50,20 @@
     (finally
       (stop-bot! @state/state))))
 
-;; @state/course-map
-;; @state/state
+(comment
+ @state/course-map
+ @state/state
 
-;; @(d-rest/create-message! (:rest @state/state) "938313279250530394" :content "sheesh")
-;; @(d-rest/create-guild-role! (:rest @state/state) state/guild-id :name "a-cool-role-for-cool-people")
-;; @(d-rest/create-guild-channel! (:rest @state/state) state/guild-id "neat-things" :type 4)
-;; @(d-rest/create-guild-channel! (:rest @state/state) state/guild-id "neat-text-chat" :type 0 :parent-id "1001819269400625184"
-;;                                :permission-overwrites
-;;                                [{:id "1001828872108642464" :type :role :allow (:view-channel d-perms/permissions-bit)}
-;;                                 {:id state/guild-id :type :role :deny (:view-channel d-perms/permissions-bit)}])
-;; @(d-rest/add-guild-member-role! (:rest @state/state) state/guild-id "312446652570927106" "1001828872108642464")
+ @(d-rest/create-message! (:rest @state/state) "938313279250530394" :content "sheesh")
+ @(d-rest/create-guild-role! (:rest @state/state) state/guild-id :name "a-cool-role-for-cool-people")
+ @(d-rest/create-guild-channel! (:rest @state/state) state/guild-id "neat-things" :type 4)
+ @(d-rest/create-guild-channel! (:rest @state/state) state/guild-id "neat-text-chat" :type 0 :parent-id "1001819269400625184"
+                                :permission-overwrites
+                                [{:id "1001828872108642464" :type :role :allow (:view-channel d-perms/permissions-bit)}
+                                 {:id state/guild-id :type :role :deny (:view-channel d-perms/permissions-bit)}])
+ @(d-rest/add-guild-member-role! (:rest @state/state) state/guild-id "312446652570927106" "1001828872108642464")
 
-;; (bit-shift-left 1 10)
-
-;; (def bot (future (-main)))
-;; (future-cancel bot)
+ (def bot (future (-main)))
+ (future-cancel bot)
+ @(d-rest/bulk-overwrite-guild-application-commands! (:rest @state/state) state/app-id state/guild-id commands)
+ )

@@ -23,11 +23,15 @@
 (defn display [max-len max-code-length max-count [code popularity]]
   (str (format (str "%-" max-code-length "s") code)
        "\t" (make-bar max-len (/ popularity max-count))
-       "\t" popularity " / " max-count))
+       "\t" popularity))
 
 (defn score-graph [course-map]
   (if (empty? course-map)
     "No courses registered."
-    (let [max-count (apply max (vals course-map))
+    (let [max-count (apply max (map (comp :count :courses) (vals course-map)))
           max-code-length (apply max (map count (keys course-map)))]
-      (string/join "\n" (map (partial display 50 max-code-length max-count) (sort-by val > course-map))))))
+      (->> (sort-by (comp :count :courses val) > course-map)
+           (#(map vector (keys %) (map (comp :count :courses) (vals %))))
+           (map #(display 50 max-code-length max-count %))
+           (string/join "\n")
+           (#(str % "\nTotal: " max-count))))))

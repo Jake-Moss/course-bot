@@ -8,8 +8,16 @@
              handler/reset
              handler/clean
              handler/set-interest
+             handler/create-roles-and-channels
+             handler/remove-roles-and-channels
              handler/dump
              handler/chart
+             handler/update-charts
+             handler/auto-enroll
+             handler/auto-save
+             handler/force-register
+             handler/force-deregister
+             handler/override
              handler/ping
              handler/unknown)
 
@@ -19,9 +27,11 @@
              handler/unknown)
 
   (cmd/group ["course"] ; common prefix for all following commands
-             handler/course
+             handler/register
+             handler/deregister
              handler/unknown))
 
 (cmd/defpaths autocomplete-paths
   (cmd/group ["course"]
-    handler/course-autocomplete))
+    handler/register-autocomplete
+    handler/deregister-autocomplete))

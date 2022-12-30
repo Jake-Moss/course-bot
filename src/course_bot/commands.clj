@@ -8,6 +8,7 @@
   (scs/command
    "fun"
    "Fun commands"
+   :default-member-permissions "2048"
    :options
    [(scs/sub-command
      "reverse-input"
@@ -25,10 +26,16 @@
   (scs/command
    "course"
    "Course commands"
+   :default-member-permissions "2048" ;; Permision to send message
    :options
    [(scs/sub-command
      "register"
      "Register your interest in the course"
+     :options
+     [(assoc input-option :autocomplete true)])
+    (scs/sub-command
+     "deregister"
+     "Deregister your interest in the course"
      :options
      [(assoc input-option :autocomplete true)])]))
 
@@ -36,6 +43,7 @@
   (scs/command
    "sudo"
    "Admin commands"
+   :default-member-permissions "0" ;; Admin only
    :options
    [(scs/sub-command
      "reset"
@@ -56,8 +64,51 @@
      "Dump the internal map")
 
     (scs/sub-command
+     "create-roles-and-channels"
+     "Create all the roles and channels present in the map")
+
+    (scs/sub-command
+     "remove-roles-and-channels"
+     "Remove all the roles and channels present in the map")
+
+    (scs/sub-command
      "chart"
      "Send a message containing the popularity chart.")
+    (scs/sub-command
+     "update"
+     "Update all popularity charts.")
+
+    (scs/sub-command
+     "override"
+     "Override the internal course map with the supplied one. Supply no map to get help"
+     :options
+     [(scs/option "map" "course map" :string)])
+
+    (scs/sub-command
+     "auto-enroll"
+     "Change the auto-enroll value"
+     :options
+     [(scs/option "value" "Value. Provide none to query" :boolean)])
+
+    (scs/sub-command
+     "auto-save"
+     "Change the auto-save value"
+     :options
+     [(scs/option "value" "Value. Provide none to query" :boolean)])
+
+    (scs/sub-command
+     "force-register"
+     "Register another user to a course for them"
+     :options
+     [(scs/option "user" "id of the user (right-click 'Copy Id')" :string :required true)
+      (scs/option "course" "Course code" :string :required true)])
+
+    (scs/sub-command
+     "force-deregister"
+     "Deregister another user from a course for them"
+     :options
+     [(scs/option "user" "id of the user (right-click 'Copy Id')" :string :required true)
+      (scs/option "course" "Course code" :string :required true)])
 
     (scs/sub-command
      "ping"
