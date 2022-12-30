@@ -36,7 +36,7 @@
   (boolean (re-matches #"[A-Z]{4}\d{4}" course)))
 
 (defn already-registered? [course user-id]
-  (contains? (get-in @state/course-map [(subs course 4) :courses course :users]) user-id))
+  (contains? (get-in @state/course-map [(subs course 0 4) :courses course :users]) user-id))
 
 (defn register! [course user-id]
   (let [course (str/upper-case course)]
