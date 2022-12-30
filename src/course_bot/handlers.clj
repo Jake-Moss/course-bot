@@ -89,7 +89,8 @@
   (let [input (str/upper-case input)]
     (rsp/autocomplete-result
      (->> @state/course-map
-          (#(map (comp keys :courses) (vals %)))
+          (#(map :courses (vals %)))
+          (apply merge)
           (take 24) ;; 25 is discord autocomplete limit
           (sort-by (comp :count val) >)
           keys
@@ -113,7 +114,8 @@
   (let [input (str/upper-case input)]
     (rsp/autocomplete-result
      (->> @state/course-map
-          (#(map (comp keys :courses) (vals %)))
+          (#(map :courses (vals %)))
+          (apply merge)
           (filter #(str/starts-with? (first %) input))
           (take 24) ;; 25 is discord autocomplete limit
           (keep #(when (contains? (get (second %) :users #{}) user-id) (first %)))
