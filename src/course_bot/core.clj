@@ -15,9 +15,9 @@
             [clojure.edn :as edn]))
 
 
-(defn start-bot! [token _]
+(defn start-bot! [token intents]
   (let [event-channel (async/chan 100)
-        gateway-connection (d-conn/connect-bot! token event-channel :intents #{})
+        gateway-connection (d-conn/connect-bot! token event-channel :intents intents)
         rest-connection (d-rest/start-connection! token)
         event-handler (-> route-interaction
                           (partial (assoc gateway-defaults
@@ -38,7 +38,7 @@
 
 
 (defn -main [& args]
-  (reset! state/state (start-bot! (:token state/config) #{:guild-messages}))
+  (reset! state/state (start-bot! (:token state/config) #{}))
   (reset! state/bot-id (:id @(d-rest/get-current-user! (:rest @state/state))))
   (reset! state/course-map (edn/read-string (slurp (:save-filename state/config))))
   (reset! state/charts (edn/read-string (slurp "charts.edn")))
