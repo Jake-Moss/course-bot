@@ -123,6 +123,14 @@
       (scs/option "course" "Course code" :string :required true)])
 
     (scs/sub-command
+     "enroll-all"
+     "Enroll all those registered")
+
+    (scs/sub-command
+     "unenroll-all"
+     "Unenroll all those registered")
+
+    (scs/sub-command
      "ping"
      "pong the ping.")]))
 

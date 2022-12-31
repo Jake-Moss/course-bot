@@ -19,6 +19,8 @@
              handler/auto-save
              handler/force-register
              handler/force-deregister
+             handler/enroll-all
+             handler/unenroll-all
              handler/override
              handler/ping
              handler/unknown)

@@ -38,6 +38,26 @@
 (defn already-registered? [course user-id]
   (contains? (get-in @state/course-map [(subs course 0 4) :courses course :users]) user-id))
 
+(defn enroll! [course user-id]
+  (when-let [role-id (get-in @state/course-map [(subs course 0 4) :courses course :role-id])]
+    @(d-rest/add-guild-member-role! (:rest @state/state) state/guild-id user-id role-id)))
+
+(defn unenroll! [course user-id]
+  (when-let [role-id (get-in @state/course-map [(subs course 0 4) :courses course :role-id])]
+    @(d-rest/remove-guild-member-role! (:rest @state/state) state/guild-id user-id role-id)))
+
+(defn enroll-all! [course-map]
+  (doseq [[_ {courses :courses}] course-map]
+    (doseq [[course {users :users}] courses]
+      (doseq [user-id users]
+        (enroll! course user-id)))))
+
+(defn unenroll-all! [course-map]
+  (doseq [[_ {courses :courses}] course-map]
+    (doseq [[course {users :users}] courses]
+      (doseq [user-id users]
+        (unenroll! course user-id)))))
+
 (defn register! [course user-id]
   (let [course (str/upper-case course)]
     (cond
@@ -51,6 +71,8 @@
               (state/register-course! course user-id)
               (when @state/auto-save
                 (state/save-debounced!))
+              (when @state/auto-enroll
+                (enroll! course user-id))
               (-> {:content (str "Registered to " course)}
                   rsp/channel-message
                   rsp/ephemeral)))))
@@ -69,6 +91,8 @@
           (state/deregister-course! course user-id)
           (when @state/auto-save
             (state/save-debounced!))
+          (when @state/auto-enroll
+            (unenroll! course user-id))
           (-> (rsp/channel-message {:content (str "Deregistered from " course)})
                rsp/ephemeral)))))
 
@@ -80,7 +104,6 @@
   (let [message (register! input user-id)]
     (state/graph-debounced!)
     message))
-
 
 (cmd/defhandler register-autocomplete
   ["register"]
@@ -122,7 +145,6 @@
           (#(if (empty? input) % (conj % input))) ;; Add user input as first element
           (map #(array-map :name %1, :value %1))
           (into [])))))
-
 
 ;;; sudo
 (cmd/defhandler reset
@@ -179,6 +201,26 @@
   (let [message (deregister! course user)]
     (state/graph-debounced!)
     message))
+
+(cmd/defhandler enroll-all
+  ["enroll-all"]
+  _
+  _
+  (future (enroll-all! @state/course-map))
+  (-> {:content "Enrolling all those registered"}
+      rsp/channel-message
+      rsp/ephemeral))
+
+(cmd/defhandler unenroll-all
+  ["unenroll-all"]
+  _
+  _
+  (future (unenroll-all! @state/course-map))
+  (-> {:content "Unenrolling all those registered"}
+      rsp/channel-message
+      rsp/ephemeral))
+
+
 
 (defn create-category! [name]
   (d-rest/create-guild-channel! (:rest @state/state) state/guild-id name :type 4))
