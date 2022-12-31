@@ -20,6 +20,8 @@
 
 (def course-map (atom {}))
 
+(def additional-roles (atom #{}))
+
 (def auto-enroll (atom false))
 
 (def auto-save (atom false))

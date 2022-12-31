@@ -97,6 +97,18 @@
      [(scs/option "value" "Value. Provide none to query" :boolean)])
 
     (scs/sub-command
+     "additional-roles"
+     "Add a role to the allowed viewing list when creating channels"
+     :options
+     [(scs/option "role" "Role id" :string :required true)])
+
+    (scs/sub-command
+     "remove-additional-roles"
+     "Remove a role to the allowed viewing list when creating channels"
+     :options
+     [(scs/option "role" "Role id" :string :required true)])
+
+    (scs/sub-command
      "force-register"
      "Register another user to a course for them"
      :options

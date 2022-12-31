@@ -10,6 +10,8 @@
              handler/set-interest
              handler/create-roles-and-channels
              handler/remove-roles-and-channels
+             handler/additional-roles
+             handler/remove-additional-roles
              handler/dump
              handler/chart
              handler/update-charts

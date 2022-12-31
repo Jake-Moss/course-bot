@@ -186,15 +186,18 @@
 (defn create-role! [name]
   (d-rest/create-guild-role! (:rest @state/state) state/guild-id :name name))
 
-(defn create-channel! [name parent-id viewable-by]
+(defn create-channel! [name parent-id viewable-by not-viewable-by]
   (d-rest/create-guild-channel!
    (:rest @state/state) state/guild-id
    name :type 0 :parent-id parent-id
    :permission-overwrites
-   [{:id viewable-by :type :role
-     :allow (:view-channel d-perms/permissions-bit)}
-    {:id state/guild-id :type :role
-     :deny (:view-channel d-perms/permissions-bit)}]))
+   (into []
+         (concat (for [role viewable-by]
+                   {:id role :type :role
+                    :allow (:view-channel d-perms/permissions-bit)})
+                 (for [role not-viewable-by]
+                   {:id role :type :role
+                    :deny (:view-channel d-perms/permissions-bit)})))))
 
 (defn create-roles-and-channels! [course-map]
   (->>
@@ -205,7 +208,10 @@
                         (for [[k v] courses
                               :let [role-id (get v :role-id (:id @(create-role! k)))
                                     channel-id (get v :channel-id
-                                                    (:id @(create-channel! k parent-id role-id)))]]
+                                                    (:id @(create-channel!
+                                                           k parent-id
+                                                           (conj @state/additional-roles role-id)
+                                                           [state/guild-id])))]]
                           [k (assoc v :role-id role-id :channel-id channel-id)])
                         (into {}))}])
    (into {})))
@@ -222,7 +228,7 @@
                               (when-let [channel-id (:channel-id v)]
                                 @(d-rest/delete-channel! (:rest @state/state) channel-id))
                               (when-let [role-id (:role-id v)]
-                                  @(d-rest/delete-guild-role! (:rest @state/state) state/guild-id role-id))
+                                @(d-rest/delete-guild-role! (:rest @state/state) state/guild-id role-id))
                               [k (dissoc v :role-id :channel-id)]))
                           (into {}))}]))
    (into {})))
@@ -245,6 +251,24 @@
   _
   (future (swap! state/course-map remove-roles-and-channels!))
   (->> {:content "Removing roles and channels"}
+      rsp/channel-message
+      rsp/ephemeral))
+
+(cmd/defhandler additional-roles
+    ["additional-roles"]
+    _
+    [role]
+  (swap! state/additional-roles conj role)
+  (->> {:content (str "Added " role " to the allowed list")}
+      rsp/channel-message
+      rsp/ephemeral))
+
+(cmd/defhandler remove-additional-roles
+    ["remove-additional-roles"]
+    _
+    [role]
+  (swap! state/additional-roles disj role)
+  (->> {:content (str "Removed " role " from the allowed list")}
       rsp/channel-message
       rsp/ephemeral))
 
