@@ -75,7 +75,7 @@
      "chart"
      "Send a message containing the popularity chart.")
     (scs/sub-command
-     "update"
+     "update-charts"
      "Update all popularity charts.")
 
     (scs/sub-command
