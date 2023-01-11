@@ -153,8 +153,7 @@
   _
   (reset! state/course-map {})
   (-> {:content "Reset all course interests"}
-      rsp/channel-message
-      rsp/ephemeral))
+      rsp/channel-message))
 
 (defn remove-below-threshold
   [nm threshold]
@@ -174,8 +173,7 @@
   [threshold]
   (swap! state/course-map remove-below-threshold threshold)
   (-> {:content (str "Removed all courses with less than " threshold " interested")}
-      rsp/channel-message
-      rsp/ephemeral))
+      rsp/channel-message))
 
 (cmd/defhandler set-interest
   ["set-interest"]
@@ -183,8 +181,7 @@
   [course n]
   (swap! state/course-map (fn [old] (assoc-in old [(subs course 0 4) :courses course :count] (int n))))
   (-> (rsp/channel-message
-       {:content (str "Updated interest of " course " to " (int n))})
-      rsp/ephemeral))
+       {:content (str "Updated interest of " course " to " (int n))})))
 
 (cmd/defhandler force-register
   ["force-register"]
@@ -208,8 +205,7 @@
   _
   (future (enroll-all! @state/course-map))
   (-> {:content "Enrolling all those registered"}
-      rsp/channel-message
-      rsp/ephemeral))
+      rsp/channel-message))
 
 (cmd/defhandler unenroll-all
   ["unenroll-all"]
@@ -217,8 +213,7 @@
   _
   (future (unenroll-all! @state/course-map))
   (-> {:content "Unenrolling all those registered"}
-      rsp/channel-message
-      rsp/ephemeral))
+      rsp/channel-message))
 
 
 
@@ -284,8 +279,7 @@
   _
   (future (swap! state/course-map create-roles-and-channels!))
   (->> {:content "Creating roles and channels"}
-      rsp/channel-message
-      rsp/ephemeral))
+      rsp/channel-message))
 
 (cmd/defhandler remove-roles-and-channels
   ["remove-roles-and-channels"]
@@ -293,8 +287,7 @@
   _
   (future (swap! state/course-map remove-roles-and-channels!))
   (->> {:content "Removing roles and channels"}
-      rsp/channel-message
-      rsp/ephemeral))
+      rsp/channel-message))
 
 (cmd/defhandler additional-roles
     ["additional-roles"]
@@ -302,8 +295,7 @@
     [role]
   (swap! state/additional-roles conj role)
   (->> {:content (str "Added " role " to the allowed list")}
-      rsp/channel-message
-      rsp/ephemeral))
+      rsp/channel-message))
 
 (cmd/defhandler remove-additional-roles
     ["remove-additional-roles"]
@@ -311,8 +303,7 @@
     [role]
   (swap! state/additional-roles disj role)
   (->> {:content (str "Removed " role " from the allowed list")}
-      rsp/channel-message
-      rsp/ephemeral))
+      rsp/channel-message))
 
 (cmd/defhandler dump
   ["dump"]
@@ -322,8 +313,7 @@
       pr-str
       d-format/code-block
       (assoc {} :content)
-      rsp/channel-message
-      rsp/ephemeral))
+      rsp/channel-message))
 
 (cmd/defhandler chart
   ["chart"]
@@ -338,7 +328,7 @@
                                                   (score-graph @state/course-map)))]
            {:id id :channel-id channel-id}))
   (spit "charts.edn" (pr-str @state/charts))
-  (->> {:content "Created the graph.\n\nYou can use `/sudo update` to force an update of all charts"}
+  (->> {:content "Created the graph.\n\nYou can use `/sudo update-charts` to force an update of all charts"}
        rsp/channel-message
        rsp/ephemeral))
 
@@ -348,8 +338,7 @@
   _
   (state/update-charts!)
   (->> {:content "Forcibly updated all charts"}
-       rsp/channel-message
-       rsp/ephemeral))
+       rsp/channel-message))
 
 (cmd/defhandler auto-enroll
   ["auto-enroll"]
@@ -361,8 +350,7 @@
            (reset! state/auto-enroll value)
            (str "Set auto-enroll to " value)))
        (assoc {} :content)
-       rsp/channel-message
-       rsp/ephemeral))
+       rsp/channel-message))
 
 (cmd/defhandler auto-save
   ["auto-save"]
@@ -374,8 +362,7 @@
            (reset! state/auto-save value)
            (str "Set auto-save to " value)))
        (assoc {} :content)
-       rsp/channel-message
-       rsp/ephemeral))
+       rsp/channel-message))
 
 (cmd/defhandler override
   ["override"]
@@ -393,8 +380,7 @@
              (state/save-debounced!))
            "Overwrote the internal course map. Use `/sudo dump` to view it"))
        (assoc {} :content)
-       rsp/channel-message
-       rsp/ephemeral))
+       rsp/channel-message))
 
 (cmd/defhandler ping
   ["ping"]
