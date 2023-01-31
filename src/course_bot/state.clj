@@ -74,4 +74,4 @@
 
 (def graph-debounced! (debounce #(update-charts!) (* 10 1000)))
 
-(def config-debounced! (debounce #(spit "config.edn" (pr-str (dissoc % :token))) (* 60 1000)))
+(def config-debounced! (debounce #(spit "config.edn" (pr-str (dissoc % :token :application-id))) (* 60 1000)))

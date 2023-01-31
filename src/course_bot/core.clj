@@ -46,7 +46,7 @@
   (add-watch state/course-map :course-map-saver (fn [_ _ _ new] (when (:auto-save @state/config) (state/course-map-debounced! new))))
   (add-watch state/config :config-saver (fn [_ _ _ new] (state/config-debounced! new)))
   (try
-    (d-rest/bulk-overwrite-guild-application-commands! (:rest @state/state) state/app-id state/guild-id commands)
+    (d-rest/bulk-overwrite-guild-application-commands! (:rest @state/state) (:application-id @state/config) state/guild-id commands)
     (d-event/message-pump! (:events @state/state)
                            (partial d-event/dispatch-handlers
                                     {:interaction-create [#((:handler @state/state) %2)]}))
@@ -73,5 +73,5 @@
 
    (def bot (future (-main)))
    (future-cancel bot)
-   @(d-rest/bulk-overwrite-guild-application-commands! (:rest @state/state) state/app-id "716997853121216613" commands)
+   @(d-rest/bulk-overwrite-guild-application-commands! (:rest @state/state) (:application-id @state/config) "716997853121216613" commands)
    ))
