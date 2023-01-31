@@ -22,6 +22,7 @@
              handler/enroll-all
              handler/unenroll-all
              handler/override
+             handler/save
              handler/ping
              handler/unknown)
 

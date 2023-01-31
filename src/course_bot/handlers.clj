@@ -385,6 +385,14 @@
        (assoc {} :content)
        rsp/channel-message))
 
+(cmd/defhandler save
+  ["save"]
+  _
+  _
+  (state/save!)
+  (-> (rsp/channel-message {:content "Saved config and course-map"})
+      rsp/ephemeral))
+
 (cmd/defhandler ping
   ["ping"]
   _

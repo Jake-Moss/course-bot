@@ -75,3 +75,7 @@
 (def graph-debounced! (debounce #(update-charts!) (* 10 1000)))
 
 (def config-debounced! (debounce #(spit "config.edn" (pr-str (dissoc % :token :application-id))) (* 60 1000)))
+
+(defn save! []
+  (spit "config.edn" (pr-str (dissoc @config :token :application-id)))
+  (spit (:save-filename @config) @course-map))

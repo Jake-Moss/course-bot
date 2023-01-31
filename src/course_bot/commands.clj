@@ -131,6 +131,10 @@
      "Unenroll all those registered")
 
     (scs/sub-command
+     "save"
+     "Just save everything to disk now, *NOT* intended for use other than debug")
+
+    (scs/sub-command
      "ping"
      "pong the ping.")]))
 
