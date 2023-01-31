@@ -1,5 +1,1 @@
-{:playing "In development"
- :responses ["Hello there" "Good evening" "Good morning" "G'day" "Hi" "Howdy :cowboy:"]
- :application-id "938362352544411668"
- :save-filename "course-list.edn"
- :save-period 300}
+{:application-id "938362352544411668", :save-filename "course-list.edn", :save-period 300, :auto-enroll false, :auto-save true, :additional-roles #{}, :charts []}

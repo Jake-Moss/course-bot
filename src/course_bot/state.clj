@@ -10,29 +10,15 @@
 
 (def bot-id (atom nil))
 
-(def config (merge
-             (edn/read-string (slurp "config.edn"))
-             (edn/read-string (slurp "token.edn"))))
-
-(def app-id (:application-id config))
-
-(def guild-id "716997853121216613")
+(def config (atom
+             (merge
+              (edn/read-string (slurp "config.edn"))
+              (edn/read-string (slurp "token.edn")))))
 
 (def course-map (atom {}))
 
-(def additional-roles (atom #{}))
-
-(def auto-enroll (atom false))
-
-(def auto-save (atom false))
-
-(defn save [filename]
-    (spit filename (pr-str @course-map)))
-
-(def charts (atom []))
-
 (defn update-charts! []
-  (swap! charts
+  (swap! config update :charts
          #(mapv
            (fn [{channel-id :channel-id
                  message-id :id}]
@@ -84,6 +70,8 @@
 ;; (say-hello "is it me you're looking for?")
 ;; (say-hello "Lionel")
 
-(def save-debounced! (debounce #(save (:save-filename config)) (* 60 1000)))
+(def course-map-debounced! (debounce #(spit (:save-filename @config) %) (* 10 1000)))
 
 (def graph-debounced! (debounce #(update-charts!) (* 10 1000)))
+
+(def config-debounced! (debounce #(spit "config.edn" (pr-str (dissoc % :token))) (* 60 1000)))

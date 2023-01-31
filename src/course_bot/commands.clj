@@ -98,9 +98,9 @@
 
     (scs/sub-command
      "additional-roles"
-     "Add a role to the allowed viewing list when creating channels"
+     "Add a role to the allowed viewing list when creating channels. Supply none to view it"
      :options
-     [(scs/option "role" "Role id" :string :required true)])
+     [(scs/option "role" "Role id" :string)])
 
     (scs/sub-command
      "remove-additional-roles"

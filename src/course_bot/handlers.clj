@@ -38,27 +38,27 @@
 (defn already-registered? [course user-id]
   (contains? (get-in @state/course-map [(subs course 0 4) :courses course :users]) user-id))
 
-(defn enroll! [course user-id]
+(defn enroll! [course user-id guild-id]
   (when-let [role-id (get-in @state/course-map [(subs course 0 4) :courses course :role-id])]
-    @(d-rest/add-guild-member-role! (:rest @state/state) state/guild-id user-id role-id)))
+    @(d-rest/add-guild-member-role! (:rest @state/state) guild-id user-id role-id)))
 
-(defn unenroll! [course user-id]
+(defn unenroll! [course user-id guild-id]
   (when-let [role-id (get-in @state/course-map [(subs course 0 4) :courses course :role-id])]
-    @(d-rest/remove-guild-member-role! (:rest @state/state) state/guild-id user-id role-id)))
+    @(d-rest/remove-guild-member-role! (:rest @state/state) guild-id user-id role-id)))
 
-(defn enroll-all! [course-map]
+(defn enroll-all! [course-map guild-id]
   (doseq [[_ {courses :courses}] course-map]
     (doseq [[course {users :users}] courses]
       (doseq [user-id users]
-        (enroll! course user-id)))))
+        (enroll! course user-id guild-id)))))
 
-(defn unenroll-all! [course-map]
+(defn unenroll-all! [course-map guild-id]
   (doseq [[_ {courses :courses}] course-map]
     (doseq [[course {users :users}] courses]
       (doseq [user-id users]
-        (unenroll! course user-id)))))
+        (unenroll! course user-id guild-id)))))
 
-(defn register! [course user-id]
+(defn register! [course user-id guild-id]
   (let [course (str/upper-case course)]
     (cond
       (not (course? course)) (-> {:content (str course " is not a valid course code")}
@@ -69,15 +69,13 @@
                                               rsp/ephemeral)
       :else (do
               (state/register-course! course user-id)
-              (when @state/auto-save
-                (state/save-debounced!))
-              (when @state/auto-enroll
-                (enroll! course user-id))
+              (when (:auto-enroll @state/config)
+                (enroll! course user-id guild-id))
               (-> {:content (str "Registered to " course)}
                   rsp/channel-message
                   rsp/ephemeral)))))
 
-(defn deregister! [course user-id]
+(defn deregister! [course user-id guild-id]
   (let [course (str/upper-case course)]
     (cond
       (not (course? course)) (-> {:content (str course " is not a valid course code")}
@@ -89,19 +87,17 @@
       :else
         (do
           (state/deregister-course! course user-id)
-          (when @state/auto-save
-            (state/save-debounced!))
-          (when @state/auto-enroll
-            (unenroll! course user-id))
+          (when (:auto-enroll @state/config)
+            (unenroll! course user-id guild-id))
           (-> (rsp/channel-message {:content (str "Deregistered from " course)})
                rsp/ephemeral)))))
 
 ;;; course
 (cmd/defhandler register
   ["register"]
-  {{{user-id :id} :user} :member} ; Using the interaction binding to get the user who ran the command
+  {{{user-id :id} :user} :member guild-id :guild-id} ; Using the interaction binding to get the user who ran the command
   [input]
-  (let [message (register! input user-id)]
+  (let [message (register! input user-id guild-id)]
     (state/graph-debounced!)
     message))
 
@@ -124,9 +120,9 @@
 
 (cmd/defhandler deregister
   ["deregister"]
-  {{{user-id :id} :user} :member} ; Using the interaction binding to get the user who ran the command
+  {{{user-id :id} :user} :member guild-id :guild-id} ; Using the interaction binding to get the user who ran the command
   [input]
-  (let [message (deregister! input user-id)]
+  (let [message (deregister! input user-id guild-id)]
     (state/graph-debounced!)
     message))
 
@@ -177,55 +173,61 @@
 
 (cmd/defhandler set-interest
   ["set-interest"]
-  _
+  a
   [course n]
-  (swap! state/course-map (fn [old] (assoc-in old [(subs course 0 4) :courses course :count] (int n))))
-  (-> (rsp/channel-message
-       {:content (str "Updated interest of " course " to " (int n))})))
+  (let [n (int n)]
+    (swap! state/course-map (fn [old] (if (= n 0)
+                                        (update-in old [(subs course 0 4) :courses] dissoc course)
+                                        (assoc-in old [(subs course 0 4) :courses course :count] n))))
+    (-> {:content (if (= n 0)
+                    (str "Removed " course)
+                    (str "Updated interest of " course " to " n))}
+        rsp/channel-message)))
 
 (cmd/defhandler force-register
   ["force-register"]
-  _
+  {guild-id :guild-id}
   [user course]
-  (let [message (register! course user)]
+  (let [message (register! course user guild-id)]
     (state/graph-debounced!)
     message))
 
 (cmd/defhandler force-deregister
   ["force-deregister"]
-  _
+  {guild-id :guild-id}
   [user course]
-  (let [message (deregister! course user)]
+  (let [message (deregister! course user guild-id)]
     (state/graph-debounced!)
     message))
 
 (cmd/defhandler enroll-all
   ["enroll-all"]
+  {guild-id :guild-id}
   _
-  _
-  (future (enroll-all! @state/course-map))
+  (future (enroll-all! @state/course-map guild-id))
+  ;; (enroll-all! @state/course-map guild-id)
   (-> {:content "Enrolling all those registered"}
       rsp/channel-message))
 
 (cmd/defhandler unenroll-all
   ["unenroll-all"]
+  {guild-id :guild-id}
   _
-  _
-  (future (unenroll-all! @state/course-map))
+  (future (unenroll-all! @state/course-map guild-id))
   (-> {:content "Unenrolling all those registered"}
       rsp/channel-message))
 
 
 
-(defn create-category! [name]
-  (d-rest/create-guild-channel! (:rest @state/state) state/guild-id name :type 4))
+(defn create-category! [name guild-id]
+  (d-rest/create-guild-channel! (:rest @state/state) guild-id name :type 4))
 
-(defn create-role! [name]
-  (d-rest/create-guild-role! (:rest @state/state) state/guild-id :name name))
+(defn create-role! [name guild-id]
+  (d-rest/create-guild-role! (:rest @state/state) guild-id :name name))
 
-(defn create-channel! [name parent-id viewable-by not-viewable-by]
+(defn create-channel! [name parent-id viewable-by not-viewable-by guild-id]
   (d-rest/create-guild-channel!
-   (:rest @state/state) state/guild-id
+   (:rest @state/state) guild-id
    name :type 0 :parent-id parent-id
    :permission-overwrites
    (into []
@@ -234,26 +236,28 @@
                     :allow (:view-channel d-perms/permissions-bit)})
                  (for [role not-viewable-by]
                    {:id role :type :role
-                    :deny (:view-channel d-perms/permissions-bit)})))))
+                    :deny (:view-channel d-perms/permissions-bit)})
+                 (list {:id @state/bot-id :type :member :allow (:view-channel d-perms/permissions-bit)})))))
 
-(defn create-roles-and-channels! [course-map]
+(defn create-roles-and-channels! [course-map guild-id]
   (->>
    (for [[prefix {courses :courses parent-id :parent-id}] course-map
-         :let [parent-id (or parent-id (:id @(create-category! prefix)))]]
+         :let [parent-id (or parent-id (:id @(create-category! prefix guild-id)))]]
      [prefix {:parent-id parent-id
               :courses (->>
                         (for [[k v] courses
-                              :let [role-id (get v :role-id (:id @(create-role! k)))
+                              :let [role-id (get v :role-id (:id @(create-role! k guild-id)))
                                     channel-id (get v :channel-id
                                                     (:id @(create-channel!
                                                            k parent-id
-                                                           (conj @state/additional-roles role-id)
-                                                           [state/guild-id])))]]
+                                                           (conj (:additional-roles @state/config) role-id)
+                                                           [guild-id]
+                                                           guild-id)))]]
                           [k (assoc v :role-id role-id :channel-id channel-id)])
                         (into {}))}])
    (into {})))
 
-(defn remove-roles-and-channels! [course-map]
+(defn remove-roles-and-channels! [course-map guild-id]
   (->>
    (for [[prefix {courses :courses parent-id :parent-id}] course-map]
      (do
@@ -265,43 +269,45 @@
                               (when-let [channel-id (:channel-id v)]
                                 @(d-rest/delete-channel! (:rest @state/state) channel-id))
                               (when-let [role-id (:role-id v)]
-                                @(d-rest/delete-guild-role! (:rest @state/state) state/guild-id role-id))
+                                @(d-rest/delete-guild-role! (:rest @state/state) guild-id role-id))
                               [k (dissoc v :role-id :channel-id)]))
                           (into {}))}]))
    (into {})))
 
-;; (create-roles-and-channels! @state/course-map)
-;; (remove-roles-and-channels! @state/course-map)
 
 (cmd/defhandler create-roles-and-channels
   ["create-roles-and-channels"]
+  {guild-id :guild-id}
   _
-  _
-  (future (swap! state/course-map create-roles-and-channels!))
+  (future (swap! state/course-map create-roles-and-channels! guild-id))
   (->> {:content "Creating roles and channels"}
       rsp/channel-message))
 
 (cmd/defhandler remove-roles-and-channels
   ["remove-roles-and-channels"]
+  {guild-id :guild-id}
   _
-  _
-  (future (swap! state/course-map remove-roles-and-channels!))
+  (future (swap! state/course-map remove-roles-and-channels! guild-id))
   (->> {:content "Removing roles and channels"}
       rsp/channel-message))
 
 (cmd/defhandler additional-roles
-    ["additional-roles"]
-    _
-    [role]
-  (swap! state/additional-roles conj role)
-  (->> {:content (str "Added " role " to the allowed list")}
-      rsp/channel-message))
+  ["additional-roles"]
+  _
+  [role]
+  (if role
+    (do
+      (swap! state/config update :additional-roles conj role)
+      (->> {:content (str "Added " role " to the allowed list")}
+           rsp/channel-message))
+    (->> {:content (str "Allowed list: " (:additional-roles @state/config))}
+           rsp/channel-message)))
 
 (cmd/defhandler remove-additional-roles
     ["remove-additional-roles"]
     _
     [role]
-  (swap! state/additional-roles disj role)
+  (swap! state/config update :additional-roles disj role)
   (->> {:content (str "Removed " role " from the allowed list")}
       rsp/channel-message))
 
@@ -319,7 +325,7 @@
   ["chart"]
   {channel-id :channel-id}
   _
-  (swap! state/charts conj
+  (swap! state/config update :charts conj
          (let [{id :id
                 channel-id :channel-id}
                @(d-rest/create-message! (:rest @state/state)
@@ -327,7 +333,6 @@
                                         :content (d-format/code-block
                                                   (score-graph @state/course-map)))]
            {:id id :channel-id channel-id}))
-  (spit "charts.edn" (pr-str @state/charts))
   (->> {:content "Created the graph.\n\nYou can use `/sudo update-charts` to force an update of all charts"}
        rsp/channel-message
        rsp/ephemeral))
@@ -345,9 +350,9 @@
   _
   [value]
   (->> (if (nil? value)
-         (str "auto-enroll is currently " @state/auto-enroll)
+         (str "auto-enroll is currently " (:auto-enroll @state/config))
          (do
-           (reset! state/auto-enroll value)
+           (swap! state/config assoc :auto-enroll value)
            (str "Set auto-enroll to " value)))
        (assoc {} :content)
        rsp/channel-message))
@@ -357,9 +362,9 @@
   _
   [value]
   (->> (if (nil? value)
-         (str "auto-save is currently " @state/auto-save)
+         (str "auto-save is currently " (:auto-save @state/config))
          (do
-           (reset! state/auto-save value)
+           (swap! state/config assoc :auto-save value)
            (str "Set auto-save to " value)))
        (assoc {} :content)
        rsp/channel-message))
@@ -376,8 +381,6 @@
                     " {:count 35 :users #{\"938362352544411668\"}}}")))
          (do
            (reset! state/course-map (edn/read-string map))
-           (when @state/auto-save
-             (state/save-debounced!))
            "Overwrote the internal course map. Use `/sudo dump` to view it"))
        (assoc {} :content)
        rsp/channel-message))
@@ -386,7 +389,6 @@
   ["ping"]
   something
   _
-  (println something)
   (-> (rsp/channel-message {:content "pong"})
       rsp/ephemeral))
 

@@ -1,1 +1,1 @@
-{"CSSE" {:courses {"CSSE1001" {:count 23}}}, "MATH" {:courses {"MATH2100" {:count 3}, "MATH1071" {:count 35}, "MATH1061" {:count 7}}}, "ENGG" {:courses {"ENGG1001" {:count 1}}}}
+{"CSSE" {:courses {"CSSE1001" {:count 69}}}, "MATH" {:courses {"MATH2100" {:count 3}, "MATH1071" {:count 35}, "MATH1061" {:count 7}}}, "ENGG" {:courses {"ENGG1001" {:count 1}}}}
