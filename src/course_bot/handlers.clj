@@ -173,7 +173,7 @@
 
 (cmd/defhandler set-interest
   ["set-interest"]
-  a
+  _
   [course n]
   (let [n (int n)]
     (swap! state/course-map (fn [old] (if (= n 0)
@@ -387,7 +387,7 @@
 
 (cmd/defhandler ping
   ["ping"]
-  something
+  _
   _
   (-> (rsp/channel-message {:content "pong"})
       rsp/ephemeral))
