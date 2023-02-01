@@ -379,17 +379,15 @@
   ["override"]
   _
   [map]
-  (->> (if (nil? map)
-         (str "Override the internal course map with the supplied one. Use clojure.edn format.\n"
-              "Example:\n"
-              (d-format/code-block
-               (str "{\"CSSE\" {:courses {\"CSSE1001\" {:count 23}}}, \"MATH\" {:courses {\"MATH1071\""
-                    " {:count 35 :users #{\"938362352544411668\"}}}")))
-         (do
-           (reset! state/course-map (edn/read-string map))
-           "Overwrote the internal course map. Use `/sudo dump` to view it"))
-       (assoc {} :content)
-       rsp/channel-message))
+  (let [old (d-format/code-block (pr-str @state/course-map))]
+    (->> (if (nil? map)
+           (str "Override the internal course map with the supplied one. Use clojure.edn format.\n"
+                "Its currently:" old)
+           (do
+             (reset! state/course-map (edn/read-string map))
+             (str "Overwrote the internal course map. Use `/sudo dump` to view it. It was: " old)))
+         (assoc {} :content)
+         rsp/channel-message)))
 
 (cmd/defhandler save
   ["save"]
