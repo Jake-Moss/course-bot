@@ -38,8 +38,31 @@
 (defn already-registered? [course user-id]
   (contains? (get-in @state/course-map [(subs course 0 4) :courses course :users]) user-id))
 
+(defn create-category! [name guild-id]
+  (d-rest/create-guild-channel! (:rest @state/state) guild-id name :type 4))
+
+(defn create-role! [name guild-id]
+  (let [{id :id :as rest} @(d-rest/create-guild-role! (:rest @state/state) guild-id :name name)]
+    (swap! state/course-map assoc-in [(subs name 0 4) :courses name :role-id] id)
+    rest))
+
+(defn create-channel! [name parent-id viewable-by not-viewable-by guild-id]
+  (d-rest/create-guild-channel!
+   (:rest @state/state) guild-id
+   name :type 0 :parent-id parent-id
+   :permission-overwrites
+   (into []
+         (concat (for [role viewable-by]
+                   {:id role :type :role
+                    :allow (:view-channel d-perms/permissions-bit)})
+                 (for [role not-viewable-by]
+                   {:id role :type :role
+                    :deny (:view-channel d-perms/permissions-bit)})
+                 (list {:id @state/bot-id :type :member :allow (:view-channel d-perms/permissions-bit)})))))
+
 (defn enroll! [course user-id guild-id]
-  (when-let [role-id (get-in @state/course-map [(subs course 0 4) :courses course :role-id])]
+  (let [role-id (or (get-in @state/course-map [(subs course 0 4) :courses course :role-id])
+                    (:id (create-role! course guild-id)))]
     @(d-rest/add-guild-member-role! (:rest @state/state) guild-id user-id role-id)))
 
 (defn unenroll! [course user-id guild-id]
@@ -218,27 +241,6 @@
       rsp/channel-message))
 
 
-
-(defn create-category! [name guild-id]
-  (d-rest/create-guild-channel! (:rest @state/state) guild-id name :type 4))
-
-(defn create-role! [name guild-id]
-  (d-rest/create-guild-role! (:rest @state/state) guild-id :name name))
-
-(defn create-channel! [name parent-id viewable-by not-viewable-by guild-id]
-  (d-rest/create-guild-channel!
-   (:rest @state/state) guild-id
-   name :type 0 :parent-id parent-id
-   :permission-overwrites
-   (into []
-         (concat (for [role viewable-by]
-                   {:id role :type :role
-                    :allow (:view-channel d-perms/permissions-bit)})
-                 (for [role not-viewable-by]
-                   {:id role :type :role
-                    :deny (:view-channel d-perms/permissions-bit)})
-                 (list {:id @state/bot-id :type :member :allow (:view-channel d-perms/permissions-bit)})))))
-
 (defn create-roles-and-channels! [course-map guild-id]
   (->>
    (for [[prefix {courses :courses parent-id :parent-id}] course-map
@@ -246,13 +248,13 @@
      [prefix {:parent-id parent-id
               :courses (->>
                         (for [[k v] courses
-                              :let [role-id (get v :role-id (:id @(create-role! k guild-id)))
-                                    channel-id (get v :channel-id
-                                                    (:id @(create-channel!
-                                                           k parent-id
-                                                           (conj (:additional-roles @state/config) role-id)
-                                                           [guild-id]
-                                                           guild-id)))]]
+                              :let [role-id (or (get v :role-id) (:id (create-role! k guild-id)))
+                                    channel-id (or (get v :channel-id)
+                                                   (:id @(create-channel!
+                                                          k parent-id
+                                                          (conj (:additional-roles @state/config) role-id)
+                                                          [guild-id]
+                                                          guild-id)))]]
                           [k (assoc v :role-id role-id :channel-id channel-id)])
                         (into {}))}])
    (into {})))
@@ -279,15 +281,19 @@
   ["create-roles-and-channels"]
   {guild-id :guild-id}
   _
-  (future (swap! state/course-map create-roles-and-channels! guild-id))
-  (->> {:content "Creating roles and channels"}
+  (future
+    (let [course-map (create-roles-and-channels! @state/course-map guild-id)]
+        (reset! state/course-map course-map)))
+  (->> {:content "Creating roles and channels..."}
       rsp/channel-message))
 
 (cmd/defhandler remove-roles-and-channels
   ["remove-roles-and-channels"]
   {guild-id :guild-id}
   _
-  (future (swap! state/course-map remove-roles-and-channels! guild-id))
+  (future
+    (let [course-map (remove-roles-and-channels! @state/course-map guild-id)]
+       (reset! state/course-map course-map)))
   (->> {:content "Removing roles and channels"}
       rsp/channel-message))
 
