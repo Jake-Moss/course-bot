@@ -22,6 +22,8 @@
              handler/enroll-all
              handler/unenroll-all
              handler/override
+             handler/course-regex
+             handler/config
              handler/save
              handler/ping
              handler/unknown)

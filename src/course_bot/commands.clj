@@ -85,6 +85,18 @@
      [(scs/option "map" "course map" :string)])
 
     (scs/sub-command
+     "config"
+     "Override the config with the supplied one. Supply no map to get the current value"
+     :options
+     [(scs/option "value" "Config." :string)])
+
+    (scs/sub-command
+     "course-regex"
+     "Override the course-regex with the supplied one. Supply no map to get the current value"
+     :options
+     [(scs/option "value" "java regex" :string)])
+
+    (scs/sub-command
      "auto-enroll"
      "Change the auto-enroll value"
      :options

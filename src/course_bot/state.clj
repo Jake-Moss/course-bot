@@ -17,6 +17,8 @@
 
 (def course-map (atom {}))
 
+(def course-regex (atom (re-pattern (:course-regex @config))))
+
 (defn update-charts! []
   (swap! config update :charts
          #(mapv

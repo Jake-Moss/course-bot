@@ -14,7 +14,7 @@
 
 ;;; fun
 (cmd/defhandler reverse-input
-  ["reverse"]
+  ["reverse-input"]
   _
   [input words]
   (rsp/channel-message
@@ -33,7 +33,7 @@
                   str/join)}))
 
 (defn course? [course]
-  (boolean (re-matches #"[A-Z]{4}\d{4}" course)))
+  (boolean (re-matches @state/course-regex course)))
 
 (defn already-registered? [course user-id]
   (contains? (get-in @state/course-map [(subs course 0 4) :courses course :users]) user-id))
@@ -398,6 +398,27 @@
   (state/save!)
   (-> (rsp/channel-message {:content "Saved config and course-map"})
       rsp/ephemeral))
+
+(cmd/defhandler config
+  ["config"]
+  _
+    [value]
+  (let [value (dissoc (edn/read-string value) :token :application-id)
+        old (d-format/code-block (pr-str (dissoc @state/config :token :application-id)))]
+    (if value
+      (do (swap! state/config merge value)
+          (rsp/channel-message {:content (str "Updated config. It was: " old)}))
+      (rsp/channel-message {:content old}))))
+
+(cmd/defhandler course-regex
+  ["course-regex"]
+  _
+  [value]
+  (if value
+    (do (reset! state/course-regex (re-pattern value))
+        (swap! state/config assoc :course-regex value)
+        (rsp/channel-message {:content (str "Updated course-regex to " (d-format/code-block value))}))
+    (rsp/channel-message {:content (str "course-regex is " (d-format/code-block (:course-regex @state/config)))})))
 
 (cmd/defhandler ping
   ["ping"]
