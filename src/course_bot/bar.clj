@@ -35,6 +35,7 @@
                       (map (fn [[k {c :count}]]
                              [k c])))
           max-count (apply max (map second counts))
+          total (reduce + (map second counts))
           max-code-length (->> (vals course-map)
                                (map (comp keys :courses))
                                flatten
@@ -42,4 +43,4 @@
                                (apply max))]
       (->> (map #(display 50 max-code-length max-count %) counts)
            (string/join "\n")
-           (#(str % "\nTotal: " max-count))))))
+           (#(str % "\nTotal: " total))))))
