@@ -20,16 +20,13 @@
 (def course-regex (atom (re-pattern (:course-regex @config))))
 
 (defn update-charts! []
-  (swap! config update :charts
-         #(mapv
-           (fn [{channel-id :channel-id
-                 message-id :id}]
-             @(d-rest/edit-message!
-               (:rest @state)
-               channel-id
-               message-id
-               :content (d-format/code-block
-                         (score-graph @course-map)))) %)))
+  (let [graph (d-format/code-block (score-graph @course-map))]
+    (doseq [{channel-id :channel-id message-id :id} (:charts @config)]
+      @(d-rest/edit-message!
+        (:rest @state)
+        channel-id
+        message-id
+        :content graph))))
 
 ;; (defn make-roles! [course user-id]
 ;;   (when-not (get @state/course-map course)
