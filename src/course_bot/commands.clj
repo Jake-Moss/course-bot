@@ -115,6 +115,18 @@
      [(scs/option "role" "Role id" :string)])
 
     (scs/sub-command
+     "image-host-channel"
+     "Channel id where graph images will be uploaded to"
+     :options
+     [(scs/option "value" "Channel id" :string)])
+
+    (scs/sub-command
+     "embed-colour"
+     "Change or query the embed colour. Discord colour codes only"
+     :options
+     [(scs/option "value" "Colour" :string)])
+
+    (scs/sub-command
      "remove-additional-roles"
      "Remove a role to the allowed viewing list when creating channels"
      :options

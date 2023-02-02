@@ -24,6 +24,8 @@
              handler/override
              handler/course-regex
              handler/config
+             handler/image-host-channel
+             handler/embed-colour
              handler/save
              handler/ping
              handler/unknown)

@@ -1,6 +1,7 @@
 (ns course-bot.handlers
   (:require [clojure.string :as str]
             [clojure.edn :as edn]
+            [clojure.java.io :as io]
 
             [discljord.formatting :as d-format]
             [discljord.messaging :as d-rest]
@@ -115,13 +116,34 @@
           (-> (rsp/channel-message {:content (str "Deregistered from " course)})
                rsp/ephemeral)))))
 
+(defn upload-to-free-hosting [channel file]
+  (-> @(d-rest/create-message! (:rest @state/state) channel :file file)
+      :attachments
+      first
+      :url))
+
+(defn update-charts! []
+  (score-graph @state/course-map)
+  (let [{image-host-channel :image-host-channel
+         embed-color :embed-color
+         charts :charts} @state/config
+         graph-url (upload-to-free-hosting image-host-channel (clojure.java.io/file "graph.png"))]
+    (doseq [{channel-id :channel-id message-id :id} charts]
+      @(d-rest/edit-message!
+        (:rest @state/state)
+        channel-id
+        message-id
+        :embed {:color embed-color :image {:url graph-url}}))))
+
+(def graph-debounced! (state/debounce #(update-charts!) (* 10 1000)))
+
 ;;; course
 (cmd/defhandler register
   ["register"]
   {{{user-id :id} :user} :member guild-id :guild-id} ; Using the interaction binding to get the user who ran the command
   [input]
   (let [message (register! input user-id guild-id)]
-    (state/graph-debounced!)
+    (graph-debounced!)
     message))
 
 (cmd/defhandler register-autocomplete
@@ -146,7 +168,7 @@
   {{{user-id :id} :user} :member guild-id :guild-id} ; Using the interaction binding to get the user who ran the command
   [input]
   (let [message (deregister! input user-id guild-id)]
-    (state/graph-debounced!)
+    (graph-debounced!)
     message))
 
 (cmd/defhandler deregister-autocomplete
@@ -212,7 +234,7 @@
   {guild-id :guild-id}
   [user course]
   (let [message (register! course user guild-id)]
-    (state/graph-debounced!)
+    (graph-debounced!)
     message))
 
 (cmd/defhandler force-deregister
@@ -220,7 +242,7 @@
   {guild-id :guild-id}
   [user course]
   (let [message (deregister! course user guild-id)]
-    (state/graph-debounced!)
+    (graph-debounced!)
     message))
 
 (cmd/defhandler enroll-all
@@ -317,6 +339,30 @@
   (->> {:content (str "Removed " role " from the allowed list")}
       rsp/channel-message))
 
+(cmd/defhandler image-host-channel
+  ["image-host-channel"]
+  _
+  [value]
+  (if value
+    (do
+      (swap! state/config assoc :embed-colour (value))
+      (->> {:content (str "Set image hosting channel to " value)}
+           rsp/channel-message))
+    (->> {:content (str "Image hosting channel is " (d-format/code-block (:image-host-channel @state/config)))}
+           rsp/channel-message)))
+
+(cmd/defhandler embed-colour
+  ["embed-colour"]
+  _
+  [value]
+  (if value
+    (do
+      (swap! state/config assoc :embed-colour value)
+      (->> {:content (str "Embed colour is now " value)}
+           rsp/channel-message))
+    (->> {:content (str "Embed colour is " (d-format/code-block (:embed-colour @state/config)))}
+           rsp/channel-message)))
+
 (cmd/defhandler dump
   ["dump"]
   _
@@ -331,24 +377,26 @@
   ["chart"]
   {channel-id :channel-id}
   _
-  (swap! state/config update :charts conj
-         (let [{id :id
-                channel-id :channel-id}
+  (score-graph @state/course-map)
+  (let [{image-host-channel :image-host-channel
+         embed-color :embed-color} @state/config
+        graph-url (upload-to-free-hosting image-host-channel (clojure.java.io/file "graph.png"))
+        {id :id channel-id :channel-id}
                @(d-rest/create-message! (:rest @state/state)
                                         channel-id
-                                        :content (d-format/code-block
-                                                  (score-graph @state/course-map)))]
-           {:id id :channel-id channel-id}))
+                                        ;; :content (d-format/code-block message)
+                                        :embed {:color embed-color :image {:url graph-url}})]
+  (swap! state/config update :charts conj {:id id :channel-id channel-id})
   (->> {:content "Created the graph.\n\nYou can use `/sudo update-charts` to force an update of all charts"}
        rsp/channel-message
-       rsp/ephemeral))
+       rsp/ephemeral)))
 
 (cmd/defhandler update-charts
   ["update-charts"]
   _
   _
-  (state/update-charts!)
-  (->> {:content "Forcibly updated all charts"}
+  (future (update-charts!))
+  (->> {:content "Forcibly updating all charts..."}
        rsp/channel-message))
 
 (cmd/defhandler auto-enroll

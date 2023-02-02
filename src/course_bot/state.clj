@@ -1,8 +1,7 @@
 (ns course-bot.state
   (:require [clojure.edn :as edn]
             [discljord.formatting :as d-format]
-            [discljord.messaging :as d-rest]
-            [course-bot.bar :refer [score-graph]])
+            [discljord.messaging :as d-rest])
   (:import (java.util Timer TimerTask)))
 
 
@@ -19,14 +18,6 @@
 
 (def course-regex (atom (re-pattern (:course-regex @config))))
 
-(defn update-charts! []
-  (let [graph (d-format/code-block (score-graph @course-map))]
-    (doseq [{channel-id :channel-id message-id :id} (:charts @config)]
-      @(d-rest/edit-message!
-        (:rest @state)
-        channel-id
-        message-id
-        :content graph))))
 
 ;; (defn make-roles! [course user-id]
 ;;   (when-not (get @state/course-map course)
@@ -70,8 +61,6 @@
 ;; (say-hello "Lionel")
 
 (def course-map-debounced! (debounce #(spit (:save-filename @config) %) (* 10 1000)))
-
-(def graph-debounced! (debounce #(update-charts!) (* 10 1000)))
 
 (def config-debounced! (debounce #(spit "config.edn" (pr-str (dissoc % :token :application-id))) (* 60 1000)))
 

@@ -1,1 +1,1 @@
-{:save-filename "course-list.edn", :save-period 600, :auto-save true, :auto-enroll true, :course-regex "(?:MATH|CSSE|COMP|INFS|ENGG|PHYS|SCIE|COSC|STAT|DECO|MECH)\\d{4}", :additional-roles #{}, :charts []}
+{:save-filename "course-list.edn", :save-period 600, :auto-save true, :auto-enroll true, :image-host-channel "1070665227403804733", :embed-colour "3447003", :course-regex "(?:MATH|CSSE|COMP|INFS|ENGG|PHYS|SCIE|COSC|STAT|DECO|MECH)\\d{4}", :additional-roles #{}, :charts []}
