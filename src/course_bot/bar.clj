@@ -34,11 +34,13 @@
 
 
 ;; Adjust the config because the library is really stupid
-(reset! cljplot.config/configuration
+(do
+  (reset! cljplot.config/configuration
         (-> @cljplot.config/configuration
-            (assoc-in [:label :font-size] 12)
-            (assoc-in [:axis-left :ticks :font-size] 12)
-            (assoc-in [:axis-bottom :ticks :font-size] 12)))
+            (assoc-in [:label :font-size] 16)
+            (assoc-in [:axis-left :ticks :font-size] 16)
+            (assoc-in [:axis-bottom :ticks :font-size] 16)))
+  "Here so I don't crash the repl when testing")
 
 ;; (defn score-graph [course-map]
 ;;   (if (empty? course-map)
@@ -66,20 +68,21 @@
                   (apply merge)
                   (map (fn [[k {c :count}]]
                          [k c]))
-                  (sort-by second >))
+                  (sort-by second <))
         message (str/join "\n" (map (fn [[name x]] (str name ": " x)) data))]
 
     (-> (b/series
          [:grid nil {:x nil}]
-         [:stack-vertical [:bar data {:padding-out 0.1}]])
+         [:stack-horizontal [:bar data {:padding-out 0.1}]])
         (b/preprocess-series)
-        (b/update-scale :x :fmt name)
-        (b/update-scale :y :fmt int)
+        (b/update-scale :x :fmt int)
+        (b/update-scale :y :fmt name)
         (b/add-axes :bottom)
         (b/add-axes :left)
-        (b/add-label :bottom "Course code")
-        (b/add-label :left "Popularity")
-        (r/render-lattice {:width (max (* 36 (count data)) 1024) :height 480})
+        (b/add-label :bottom "Count")
+        (b/add-label :top "Course Popularity")
+        (b/add-label :left "Course code")
+        (r/render-lattice {:width 720 :height (max (* 36 (count data)) 1024)})
         (cljplot.core/save "graph.png"))
     message))
 
@@ -101,6 +104,7 @@
            (string/join "\n")
            (#(str % "\nTotal: " total))))
 
+(score-graph @state/course-map)
 
 
 (get-in @cljplot.config/configuration [:axis-left :ticks :font-size])
