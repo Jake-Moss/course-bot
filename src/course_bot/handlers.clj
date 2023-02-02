@@ -345,7 +345,7 @@
   [value]
   (if value
     (do
-      (swap! state/config assoc :embed-colour (value))
+      (swap! state/config assoc :image-host-channel value)
       (->> {:content (str "Set image hosting channel to " value)}
            rsp/channel-message))
     (->> {:content (str "Image hosting channel is " (d-format/code-block (:image-host-channel @state/config)))}
@@ -357,10 +357,10 @@
   [value]
   (if value
     (do
-      (swap! state/config assoc :embed-colour value)
+      (swap! state/config assoc :embed-color value)
       (->> {:content (str "Embed colour is now " value)}
            rsp/channel-message))
-    (->> {:content (str "Embed colour is " (d-format/code-block (:embed-colour @state/config)))}
+    (->> {:content (str "Embed colour is " (d-format/code-block (:embed-color @state/config)))}
            rsp/channel-message)))
 
 (cmd/defhandler dump
