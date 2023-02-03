@@ -1,5 +1,7 @@
 (ns course-bot.commands
-  (:require [slash.command.structure :as scs]))
+  (:require [slash.command.structure :as scs]
+            [discljord.permissions :as d-perms]))
+
 
 
 (def input-option (scs/option "input" "Your input" :string :required true))
@@ -8,7 +10,7 @@
   (scs/command
    "fun"
    "Fun commands"
-   :default-member-permissions "2048"
+   :default-member-permissions (d-perms/permission-int '(:administrator))
    :options
    [(scs/sub-command
      "reverse-input"
@@ -26,7 +28,7 @@
   (scs/command
    "course"
    "Course commands"
-   :default-member-permissions "2048" ;; Permision to send message
+   :default-member-permissions (d-perms/permission-int '(:send-messages)) ;; Permision to send message
    :options
    [(scs/sub-command
      "register"
@@ -43,7 +45,7 @@
   (scs/command
    "sudo"
    "Admin commands"
-   :default-member-permissions "0" ;; Admin only
+   :default-member-permissions (d-perms/permission-int '(:manage-channels :manage-roles)) ;; Admin only
    :options
    [(scs/sub-command
      "reset"

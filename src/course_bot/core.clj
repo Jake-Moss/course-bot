@@ -74,5 +74,18 @@
    (def bot (future (-main)))
    (future-cancel bot)
    @(d-rest/bulk-overwrite-guild-application-commands! (:rest @state/state) (:application-id @state/config) "716997853121216613" commands)
+   (bar/score-graph @state/course-map)
+   @(d-rest/create-message! (:rest @state/state) "1070665227403804733" :file (clojure.java.io/file "graph.png"))
+   @(d-rest/create-message! (:rest @state/state) "1070665227403804733" :embed {:color "3447003" :image {:url "https://media.discordapp.net/attachments/1070665227403804733/1070666436202209280/graph.png"}})
+
+   (let [s (clojure.java.io/file "graph.png")]
+     (slurp s)
+     (slurp s)
+     (slurp s)
+     (slurp s)
+     )
+
+   (:manage-channels d-perms/permissions-bit)
+   (d-perms/permission-int (list :manage-channels :manage-roles))
 
    ))
