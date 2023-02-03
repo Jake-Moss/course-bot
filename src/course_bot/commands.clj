@@ -1,16 +1,31 @@
 (ns course-bot.commands
   (:require [slash.command.structure :as scs]
+            [slash.util :refer [omission-map]]
             [discljord.permissions :as d-perms]))
 
 
 
 (def input-option (scs/option "input" "Your input" :string :required true))
 
+(defn command
+  "Create a top level command.
+
+  See https://discord.com/developers/docs/interactions/slash-commands#application-command-object-application-command-structure.
+  `:type` must be one of the keys in [[command-types]], if given."
+  [name description & {:keys [default-member-permissions guild-id options type]}]
+  (omission-map
+   :name name
+   :description description
+   :options options
+   :guild_id guild-id
+   :default_member_permissions default-member-permissions
+   :type (some-> type scs/command-types)))
+
 (def fun-commands
-  (scs/command
+  (command
    "fun"
    "Fun commands"
-   :default-member-permissions (d-perms/permission-int '(:administrator))
+   :default-member-permissions (d-perms/permission-int '(:send-messages))
    :options
    [(scs/sub-command
      "reverse-input"
@@ -25,7 +40,7 @@
      [input-option])]))
 
 (def course-commands
-  (scs/command
+  (command
    "course"
    "Course commands"
    :default-member-permissions (d-perms/permission-int '(:send-messages)) ;; Permision to send message
@@ -42,7 +57,7 @@
      [(assoc input-option :autocomplete true)])]))
 
 (def sudo-commands
-  (scs/command
+  (command
    "sudo"
    "Admin commands"
    :default-member-permissions (d-perms/permission-int '(:manage-channels :manage-roles)) ;; Admin only
