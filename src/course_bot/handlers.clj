@@ -1,6 +1,7 @@
 (ns course-bot.handlers
   (:require [clojure.string :as str]
             [clojure.edn :as edn]
+            [clojure.pprint :as pp]
             [clojure.java.io :as io]
 
             [discljord.formatting :as d-format]
@@ -11,6 +12,7 @@
             [slash.response :as rsp]
 
             [course-bot.state :as state]
+            [course-bot.scrapper :as scrapper]
             [course-bot.bar :refer [score-graph]]))
 
 ;;; fun
@@ -83,7 +85,8 @@
         (unenroll! course user-id guild-id)))))
 
 (defn register! [course user-id guild-id]
-  (let [course (str/upper-case course)]
+  (let [course (str/upper-case course)
+        config @state/config]
     (cond
       (not (course? course)) (-> {:content (str course " is not a valid course code")}
                                 rsp/channel-message
@@ -93,7 +96,7 @@
                                               rsp/ephemeral)
       :else (do
               (state/register-course! course user-id)
-              (when (:auto-enroll @state/config)
+              (when (:auto-enroll config)
                 (enroll! course user-id guild-id))
               (-> {:content (str "Registered to " course)}
                   rsp/channel-message
@@ -135,7 +138,27 @@
         message-id
         :embed {:color embed-color :image {:url graph-url}}))))
 
+(defn string->stream
+  ([s] (string->stream s "UTF-8"))
+  ([s encoding]
+   (-> s
+       (.getBytes encoding)
+       (java.io.ByteArrayInputStream.))))
+
 (def graph-debounced! (state/debounce #(update-charts!) (* 10 1000)))
+
+(defn get-course-codes [course-map]
+  (apply concat
+         (for [{courses :courses} (vals course-map)]
+           (keys courses))))
+
+(defn get-course-embed [course]
+  (let [{embed :embed} (get @state/course-embeds course)]
+    (if embed
+      embed
+      (let [embed (scrapper/yoink-details course)]
+        (swap! state/course-embeds assoc course {:embed embed})
+        embed))))
 
 ;;; course
 (cmd/defhandler register
@@ -262,24 +285,49 @@
   (-> {:content "Unenrolling all those registered"}
       rsp/channel-message))
 
+(defn send-course-embed [course channel-id]
+  (let [{id :id channel-id :channel-id} @(d-rest/create-message! (:rest @state/state) channel-id :embed (get-course-embed course))]
+    (d-rest/pin-message! (:rest @state/state) channel-id id)
+    (swap! state/course-embeds update course assoc :id id :channel-id channel-id)))
+
+(defn send-course-embeds [course-map]
+  (doseq [[_ {courses :courses}] course-map]
+    (doseq [[course {channel-id :channel-id}] courses]
+      (send-course-embed course channel-id))))
+
+(defn update-course-embed [course]
+  (let [{id :id channel-id :channel-id} (get @state/course-embeds course)
+        embed (scrapper/yoink-details course)]
+    (swap! state/course-embeds update course assoc :embed embed)
+    (d-rest/edit-message! (:rest @state/state) channel-id id :embed embed)))
+
+(defn update-course-embeds [course-map]
+  (doseq [[_ {courses :courses}] course-map]
+    (doseq [[course _] courses]
+      (update-course-embed course))))
 
 (defn create-roles-and-channels! [course-map guild-id]
-  (->>
-   (for [[prefix {courses :courses parent-id :parent-id}] course-map
-         :let [parent-id (or parent-id (:id @(create-category! prefix guild-id)))]]
-     [prefix {:parent-id parent-id
-              :courses (->>
-                        (for [[k v] courses
-                              :let [role-id (or (get v :role-id) (:id (create-role! k guild-id)))
-                                    channel-id (or (get v :channel-id)
-                                                   (:id @(create-channel!
-                                                          k parent-id
-                                                          (conj (:additional-roles @state/config) role-id)
-                                                          [guild-id]
-                                                          guild-id)))]]
-                          [k (assoc v :role-id role-id :channel-id channel-id)])
-                        (into {}))}])
-   (into {})))
+  (let [config @state/config]
+    (->>
+     (for [[prefix {courses :courses parent-id :parent-id}] course-map
+           :let [parent-id (or parent-id (:id @(create-category! prefix guild-id)))]]
+       [prefix {:parent-id parent-id
+                :courses (->>
+                          (for [[k v] courses
+                                :let [role-id (or (get v :role-id) (:id (create-role! k guild-id)))
+                                      channel-id (or (get v :channel-id)
+                                                     (:id @(create-channel!
+                                                            k parent-id
+                                                            (conj (:additional-roles config) role-id)
+                                                            [guild-id]
+                                                            guild-id)))]]
+                            (do
+                              (when (:auto-send-embed config)
+                                (send-course-embed k channel-id))
+                              [k (assoc v :role-id role-id :channel-id channel-id)]))
+                          (into {}))}])
+   (into {}))))
+
 
 (defn remove-roles-and-channels! [course-map guild-id]
   (->>
@@ -297,7 +345,6 @@
                               [k (dissoc v :role-id :channel-id)]))
                           (into {}))}]))
    (into {})))
-
 
 (cmd/defhandler create-roles-and-channels
   ["create-roles-and-channels"]
@@ -318,6 +365,25 @@
        (reset! state/course-map course-map)))
   (->> {:content "Removing roles and channels"}
       rsp/channel-message))
+
+(cmd/defhandler send-embed
+  ["send-embed"]
+  _
+  [value]
+  (if-let [channel-id (get-in @state/course-map [(subs value 0 4) :courses value :channel-id])]
+    (do
+      (future (send-course-embed value channel-id))
+      (->> {:content (str "Sending the embed to channel: `" value "`.")}
+       rsp/channel-message
+       rsp/ephemeral))
+    (rsp/channel-message {:content (str "Course `" value "` does not exist in the internal map. Could not find a channel-id.")})))
+
+(cmd/defhandler update-embeds
+  ["update-embeds"]
+  _
+  _
+  (future (update-course-embeds @state/course-map))
+  (rsp/channel-message {:content "Updating all course embeds..."}))
 
 (cmd/defhandler additional-roles
   ["additional-roles"]
@@ -363,17 +429,18 @@
     (->> {:content (str "Embed colour is " (d-format/code-block (:embed-color @state/config)))}
            rsp/channel-message)))
 
+(defn dump-to-channel [string filename channel-id]
+  (d-rest/create-message! (:rest @state/state) channel-id :stream {:filename filename :content (string->stream string)}))
+
+
 (cmd/defhandler dump
   ["dump"]
+  {channel-id :channel-id}
   _
-  _
-  (->> @state/course-map
-      pr-str
-      d-format/code-block
-      (assoc {} :content)
-      rsp/channel-message))
+  (dump-to-channel (with-out-str (pp/pprint @state/course-map)) "course-map.txt" channel-id)
+  (rsp/channel-message {:content "Dumping course map to file..."}))
 
-(cmd/defhandler chart
+(cmd/defhandler send-chart
   ["chart"]
   {channel-id :channel-id}
   _
@@ -423,6 +490,18 @@
        (assoc {} :content)
        rsp/channel-message))
 
+(cmd/defhandler auto-send-embed
+  ["auto-send-embed"]
+  _
+  [value]
+  (->> (if (nil? value)
+         (str "auto-send-embed is currently " (:auto-send-embed @state/config))
+         (do
+           (swap! state/config assoc :auto-send-embed value)
+           (str "Set auto-send-embed to " value)))
+       (assoc {} :content)
+       rsp/channel-message))
+
 (cmd/defhandler override
   ["override"]
   _
@@ -447,14 +526,17 @@
 
 (cmd/defhandler config
   ["config"]
-  _
-    [value]
+  {channel-id :channel-id}
+  [value]
   (let [value (dissoc (edn/read-string value) :token :application-id)
-        old (d-format/code-block (pr-str (dissoc @state/config :token :application-id)))]
+        old (with-out-str (pp/pprint (dissoc @state/config :token :application-id)))]
     (if value
       (do (swap! state/config merge value)
-          (rsp/channel-message {:content (str "Updated config. It was: " old)}))
-      (rsp/channel-message {:content old}))))
+          (dump-to-channel old "config.txt" channel-id)
+          (rsp/channel-message {:content "Updated config, it was:"}))
+      (do
+        (dump-to-channel old "config.txt" channel-id)
+        (rsp/channel-message {:content "Dumping config to file..."})))))
 
 (cmd/defhandler course-regex
   ["course-regex"]

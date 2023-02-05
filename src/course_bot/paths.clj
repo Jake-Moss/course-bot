@@ -5,27 +5,34 @@
 
 (cmd/defpaths command-paths
   (cmd/group ["sudo"] ; common prefix for all following commands
-             handler/reset
-             handler/clean
-             handler/set-interest
+             (cmd/group ["chart"]
+               handler/send-chart
+               handler/update-charts)
+             (cmd/group ["embed"]
+               handler/send-embed
+               handler/update-embeds)
+             (cmd/group ["set"]
+               handler/image-host-channel
+               handler/course-regex
+               handler/embed-colour
+               handler/auto-enroll
+               handler/auto-save
+               handler/auto-send-embed
+               handler/additional-roles
+               handler/remove-additional-roles)
+             (cmd/group ["course"]
+               handler/set-interest
+               handler/force-register
+               handler/force-deregister
+               handler/enroll-all
+               handler/unenroll-all
+               handler/reset
+               handler/dump
+               handler/clean)
              handler/create-roles-and-channels
              handler/remove-roles-and-channels
-             handler/additional-roles
-             handler/remove-additional-roles
-             handler/dump
-             handler/chart
-             handler/update-charts
-             handler/auto-enroll
-             handler/auto-save
-             handler/force-register
-             handler/force-deregister
-             handler/enroll-all
-             handler/unenroll-all
              handler/override
-             handler/course-regex
              handler/config
-             handler/image-host-channel
-             handler/embed-colour
              handler/save
              handler/ping
              handler/unknown)

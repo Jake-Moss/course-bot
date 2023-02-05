@@ -2,7 +2,9 @@
   (:require [clojure.edn :as edn]
             [discljord.formatting :as d-format]
             [discljord.messaging :as d-rest])
-  (:import (java.util Timer TimerTask)))
+  (:import (java.util Timer TimerTask)
+           [ch.qos.logback.classic Level]
+           [org.slf4j LoggerFactory]))
 
 
 (def state (atom nil))
@@ -18,11 +20,29 @@
 
 (def course-regex (atom (re-pattern (:course-regex @config))))
 
+(def course-embeds (atom {}))
 
-;; (defn make-roles! [course user-id]
-;;   (when-not (get @state/course-map course)
-;;     (d-rest/create-guild-role! (:rest @state/state) state/guild-id :name course)
-;;     (d-rest/add-guild-member-role! (:rest @state/state) state/guild-id user-id "1001828872108642464")))
+;; https://github.com/vaughnd/clojure-example-logback-integration/blob/master/src/clojure_example_logback_integration/log.clj
+(def logger ^ch.qos.logback.classic.Logger (LoggerFactory/getLogger "course-bot"))
+
+(defn set-log-level!
+  "Pass keyword :error :info :debug"
+  [level]
+  (case level
+    :debug (.setLevel logger Level/DEBUG)
+    :info (.setLevel logger Level/INFO)
+    :error (.setLevel logger Level/ERROR)))
+
+(defmacro debug [& msg]
+  `(.debug logger (print-str ~@msg)))
+
+(defmacro info [& msg]
+  `(.info logger (print-str ~@msg)))
+
+(defmacro error [throwable & msg]
+  `(if (instance? Throwable ~throwable)
+    (.error logger (print-str ~@msg) ~throwable)
+    (.error logger (print-str ~throwable ~@msg))))
 
 (defn register-course! [course user-id]
   (swap! course-map (fn [map]

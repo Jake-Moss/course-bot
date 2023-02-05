@@ -12,6 +12,7 @@
             [course-bot.state :as state]
             [course-bot.paths :as path]
             [course-bot.commands :refer [commands]]
+            [course-bot.scrapper :as scrapper]
             [clojure.edn :as edn]))
 
 
@@ -46,7 +47,7 @@
   (add-watch state/config :config-saver (fn [_ _ _ new] (state/config-debounced! new)))
   (try
     (doseq [{guild-id :id} @(d-rest/get-current-user-guilds! (:rest @state/state))]
-     (d-rest/bulk-overwrite-guild-application-commands! (:rest @state/state) (:application-id @state/config) guild-id commands))
+     @(d-rest/bulk-overwrite-guild-application-commands! (:rest @state/state) (:application-id @state/config) guild-id commands))
     (d-event/message-pump! (:events @state/state)
                            (partial d-event/dispatch-handlers
                                     {:interaction-create [#((:handler @state/state) %2)]}))
@@ -73,19 +74,22 @@
 
    (def bot (future (-main)))
    (future-cancel bot)
+
    @(d-rest/bulk-overwrite-guild-application-commands! (:rest @state/state) (:application-id @state/config) "716997853121216613" commands)
    (bar/score-graph @state/course-map)
    @(d-rest/create-message! (:rest @state/state) "1070665227403804733" :file (clojure.java.io/file "graph.png"))
+   @(d-rest/create-message! (:rest @state/state) "1070665227403804733" :content "Its like 6am over there")
    @(d-rest/create-message! (:rest @state/state) "1070665227403804733" :embed {:color "3447003" :image {:url "https://media.discordapp.net/attachments/1070665227403804733/1070666436202209280/graph.png"}})
+   @(d-rest/create-message! (:rest @state/state) "1070665227403804733" :embed (scrapper/yoink-details "MATH1071"))
 
-   (let [s (clojure.java.io/file "graph.png")]
-     (slurp s)
-     (slurp s)
-     (slurp s)
-     (slurp s)
-     )
+   (d-perms/permission-flags "1071966969425")
 
    (:manage-channels d-perms/permissions-bit)
    (d-perms/permission-int (list :manage-channels :manage-roles))
+
+
+
+
+   @(d-rest/create-message! (:rest @state/state) "1070665227403804733" :stream {:filename "course-map.txt" :content (string->stream "testing")})
 
    ))
