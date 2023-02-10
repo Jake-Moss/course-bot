@@ -441,7 +441,7 @@
   (rsp/channel-message {:content "Dumping course map to file..."}))
 
 (cmd/defhandler send-chart
-  ["chart"]
+  ["send-chart"]
   {channel-id :channel-id}
   _
   (score-graph @state/course-map)
