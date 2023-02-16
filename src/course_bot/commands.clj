@@ -187,7 +187,9 @@
 
     (scs/sub-command
      "create-roles-and-channels"
-     "Create all the roles and channels present in the map")
+     "Create all the roles and channels present in the map"
+     :options
+     [(scs/option "threshold" "Threshold" :number :required true)])
 
     (scs/sub-command
      "remove-roles-and-channels"

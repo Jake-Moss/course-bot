@@ -163,8 +163,9 @@
 ;;; course
 (cmd/defhandler register
   ["register"]
-  {{{user-id :id} :user} :member guild-id :guild-id} ; Using the interaction binding to get the user who ran the command
-  [input]
+  {{{user-id :id username :username} :user} :member guild-id :guild-id} ; Using the interaction binding to get the user who ran the command
+    [input]
+  (state/info (str "Registered " username " to " input))
   (let [message (register! input user-id guild-id)]
     (graph-debounced!)
     message))
@@ -188,8 +189,9 @@
 
 (cmd/defhandler deregister
   ["deregister"]
-  {{{user-id :id} :user} :member guild-id :guild-id} ; Using the interaction binding to get the user who ran the command
-  [input]
+  {{{user-id :id username :username} :user} :member guild-id :guild-id} ; Using the interaction binding to get the user who ran the command
+    [input]
+  (state/info (str "Degreisterd " username " from " input))
   (let [message (deregister! input user-id guild-id)]
     (graph-debounced!)
     message))
@@ -306,28 +308,35 @@
     (doseq [[course _] courses]
       (update-course-embed course))))
 
-(defn create-roles-and-channels! [course-map guild-id]
-  (let [config @state/config]
-    (->>
-     (for [[prefix {courses :courses parent-id :parent-id}] course-map
-           :let [parent-id (or parent-id (:id @(create-category! prefix guild-id)))]]
-       [prefix {:parent-id parent-id
-                :courses (->>
-                          (for [[k v] courses
-                                :let [role-id (or (get v :role-id) (:id (create-role! k guild-id)))
-                                      channel-id (or (get v :channel-id)
-                                                     (:id @(create-channel!
-                                                            k parent-id
-                                                            (conj (:additional-roles config) role-id)
-                                                            [guild-id]
-                                                            guild-id)))]]
-                            (do
-                              (when (:auto-send-embed config)
-                                (send-course-embed k channel-id))
-                              [k (assoc v :role-id role-id :channel-id channel-id)]))
-                          (into {}))}])
-   (into {}))))
+(defn deep-merge [a & maps]
+  (if (map? a)
+    (apply merge-with deep-merge a maps)
+    (apply merge-with deep-merge maps)))
 
+(defn create-roles-and-channels! [course-map n guild-id]
+  (let [config @state/config]
+    (deep-merge course-map
+                (->>
+                 (for [[prefix {courses :courses parent-id :parent-id}] course-map
+                       :when (some (fn [[_ {c :count}]] (>= c n)) courses)
+                       :let [parent-id (or parent-id (:id @(create-category! prefix guild-id)))]]
+                   [prefix {:parent-id parent-id
+                            :courses (->>
+                                      (for [[k v] courses
+                                            :when (>= (:count v) n)
+                                            :let [role-id (or (get v :role-id) (:id (create-role! k guild-id)))
+                                                  channel-id (or (get v :channel-id)
+                                                                 (:id @(create-channel!
+                                                                        k parent-id
+                                                                        (conj (:additional-roles config) role-id)
+                                                                        [guild-id]
+                                                                        guild-id)))]]
+                                        (do
+                                          (when (:auto-send-embed config)
+                                            (send-course-embed k channel-id))
+                                          [k (assoc v :role-id role-id :channel-id channel-id)]))
+                                      (into {}))}])
+                 (into {})))))
 
 (defn remove-roles-and-channels! [course-map guild-id]
   (->>
@@ -348,10 +357,11 @@
 
 (cmd/defhandler create-roles-and-channels
   ["create-roles-and-channels"]
-  {guild-id :guild-id}
-  _
+    {guild-id :guild-id {username :username} :user}
+    [threshold]
+  (state/info (str "Creating roles and channels, requested by: " username))
   (future
-    (let [course-map (create-roles-and-channels! @state/course-map guild-id)]
+    (let [course-map (create-roles-and-channels! @state/course-map threshold guild-id)]
         (reset! state/course-map course-map)))
   (->> {:content "Creating roles and channels..."}
       rsp/channel-message))
