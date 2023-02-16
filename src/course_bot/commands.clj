@@ -189,7 +189,8 @@
      "create-roles-and-channels"
      "Create all the roles and channels present in the map"
      :options
-     [(scs/option "threshold" "Threshold" :number :required true)])
+     [(scs/option "threshold" "Threshold" :number :required true)
+      (scs/option "embeds" "Send embeds? If true all will be resent" :boolean)])
 
     (scs/sub-command
      "remove-roles-and-channels"

@@ -313,7 +313,7 @@
     (apply merge-with deep-merge a maps)
     (apply merge-with deep-merge maps)))
 
-(defn create-roles-and-channels! [course-map n guild-id]
+(defn create-roles-and-channels! [course-map n guild-id embeds?]
   (let [config @state/config]
     (deep-merge course-map
                 (->>
@@ -332,7 +332,7 @@
                                                                         [guild-id]
                                                                         guild-id)))]]
                                         (do
-                                          (when (:auto-send-embed config)
+                                          (when (and embeds? (:auto-send-embed config))
                                             (send-course-embed k channel-id))
                                           [k (assoc v :role-id role-id :channel-id channel-id)]))
                                       (into {}))}])
@@ -358,10 +358,10 @@
 (cmd/defhandler create-roles-and-channels
   ["create-roles-and-channels"]
     {guild-id :guild-id {username :username} :user}
-    [threshold]
+    [threshold embeds]
   (state/info (str "Creating roles and channels, requested by: " username))
   (future
-    (let [course-map (create-roles-and-channels! @state/course-map threshold guild-id)]
+    (let [course-map (create-roles-and-channels! @state/course-map threshold guild-id embeds)]
         (reset! state/course-map course-map)))
   (->> {:content "Creating roles and channels..."}
       rsp/channel-message))
