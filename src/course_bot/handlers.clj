@@ -206,8 +206,8 @@
           (#(map :courses (vals %)))
           (apply merge)
           (filter #(str/starts-with? (first %) input))
-          (take 24) ;; 25 is discord autocomplete limit
           (keep #(when (contains? (get (second %) :users #{}) user-id) (first %)))
+          (take 24) ;; 25 is discord autocomplete limit
           (#(if (empty? input) % (conj % input))) ;; Add user input as first element
           (map #(array-map :name %1, :value %1))
           (into [])))))
