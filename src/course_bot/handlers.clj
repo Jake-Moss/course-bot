@@ -41,13 +41,27 @@
 (defn already-registered? [course user-id]
   (contains? (get-in @state/course-map [(subs course 0 4) :courses course :users]) user-id))
 
+(defn get-course-codes [course-map]
+  (apply concat
+         (for [{courses :courses} (vals course-map)]
+           (keys courses))))
+
+(defn get-course [course course-map]
+  (get-in course-map [(subs course 0 4) :courses course]))
+
+(defn get-course-embed [course]
+  (let [{embed :embed} (get @state/course-embeds course)]
+    (if embed
+      embed
+      (let [embed (scrapper/yoink-details course)]
+        (swap! state/course-embeds assoc course {:embed embed})
+        embed))))
+
 (defn create-category! [name guild-id]
   (d-rest/create-guild-channel! (:rest @state/state) guild-id name :type 4))
 
 (defn create-role! [name guild-id]
-  (let [{id :id :as rest} @(d-rest/create-guild-role! (:rest @state/state) guild-id :name name)]
-    (swap! state/course-map assoc-in [(subs name 0 4) :courses name :role-id] id)
-    rest))
+  (d-rest/create-guild-role! (:rest @state/state) guild-id :name name))
 
 (defn create-channel! [name parent-id viewable-by not-viewable-by guild-id]
   (d-rest/create-guild-channel!
@@ -65,7 +79,8 @@
 
 (defn enroll! [course user-id guild-id]
   (let [role-id (or (get-in @state/course-map [(subs course 0 4) :courses course :role-id])
-                    (:id (create-role! course guild-id)))]
+                    (:id @(create-role! course guild-id)))]
+    (swap! state/course-map assoc-in [(subs course 0 4) :courses course :role-id] role-id)
     @(d-rest/add-guild-member-role! (:rest @state/state) guild-id user-id role-id)))
 
 (defn unenroll! [course user-id guild-id]
@@ -84,6 +99,40 @@
       (doseq [user-id users]
         (unenroll! course user-id guild-id)))))
 
+
+(defn send-course-embed! [course channel-id]
+  (let [{id :id channel-id :channel-id} @(d-rest/create-message! (:rest @state/state) channel-id :embed (get-course-embed course))]
+    (d-rest/pin-message! (:rest @state/state) channel-id id)
+    {course {:id id :channel-id channel-id}}))
+
+(defn send-course-embeds! [course-map]
+  (let [embeds @state/course-embeds]
+      (apply merge (for [[course {channel-id :channel-id}] (apply merge (map :courses (vals course-map)))
+                         :when (and channel-id (not (get-in embeds [course :id])))]
+                     (send-course-embed! course channel-id)))))
+
+(defn force-send-course-embeds! [course-map]
+  (apply merge (for [[course {channel-id :channel-id}] (apply merge (map :courses (vals course-map)))
+                     :when channel-id]
+                 (send-course-embed! course channel-id))))
+
+(defn update-course-embed [course]
+  (let [{id :id channel-id :channel-id} (get @state/course-embeds course)
+        embed (scrapper/yoink-details course)]
+    (when (and id channel-id embed)
+        (swap! state/course-embeds update course assoc :embed embed)
+        (d-rest/edit-message! (:rest @state/state) channel-id id :embed embed))))
+
+(defn update-course-embeds [course-map]
+  (doseq [[_ {courses :courses}] course-map]
+    (doseq [[course _] courses]
+      (update-course-embed course))))
+
+(defn deep-merge [a & maps]
+  (if (map? a)
+    (apply merge-with deep-merge a maps)
+    (apply merge-with deep-merge maps)))
+
 (defn register! [course user-id guild-id]
   (let [course (str/upper-case course)
         config @state/config]
@@ -98,9 +147,39 @@
               (state/register-course! course user-id)
               (when (:auto-enroll config)
                 (enroll! course user-id guild-id))
-              (-> {:content (str "Registered to " course)}
-                  rsp/channel-message
-                  rsp/ephemeral)))))
+              (let [course-map @state/course-map
+                    c (:count (get-course course course-map))
+                    threshold (:auto-channel-threshold config)
+                    role-id (:role-id (get-course course course-map))
+                    parent-id (:parent-id (get-in course-map [(subs course 0 4) :parent-id]))
+                    parent-id (if (and (>= c threshold) (not parent-id))
+                                (:id @(create-category! (subs course 0 4) guild-id))
+                                parent-id)
+                    channel-id (:channel-id (get-course course course-map))
+                    channel-id (if (and (>= c threshold) (not channel-id))
+                                 (let [channel-id (:id @(create-channel!
+                                                         course
+                                                         parent-id
+                                                         (conj (:additional-roles config) role-id)
+                                                         [guild-id]
+                                                         guild-id))]
+                                 (when (:auto-send-embed @state/config)
+                                   (let [embed (send-course-embed! course channel-id)]
+                                     (swap! state/course-embeds deep-merge embed)))
+                                 channel-id)
+                                 channel-id)
+                    message (if channel-id
+                              (str "Registered to " course ", join everyone else in " (d-format/mention-channel channel-id))
+                              (str "Registered to " course ", currently not enough "
+                                   "people have registered for this course. Need "
+                                   (- threshold c) " more people. Invite your friends "
+                                   "to have a channel created!"))
+                    message (-> {:content message}
+                                rsp/channel-message
+                                rsp/ephemeral)]
+                (swap! state/course-map assoc-in [(subs course 0 4) :courses course :channel-id] channel-id)
+                (swap! state/course-map assoc-in [(subs course 0 4) :parent-id] parent-id)
+                message)))))
 
 (defn deregister! [course user-id guild-id]
   (let [course (str/upper-case course)]
@@ -147,24 +226,11 @@
 
 (def graph-debounced! (state/debounce #(update-charts!) (* 10 1000)))
 
-(defn get-course-codes [course-map]
-  (apply concat
-         (for [{courses :courses} (vals course-map)]
-           (keys courses))))
-
-(defn get-course-embed [course]
-  (let [{embed :embed} (get @state/course-embeds course)]
-    (if embed
-      embed
-      (let [embed (scrapper/yoink-details course)]
-        (swap! state/course-embeds assoc course {:embed embed})
-        embed))))
-
 ;;; course
 (cmd/defhandler register
   ["register"]
-  {{{user-id :id username :username} :user} :member guild-id :guild-id} ; Using the interaction binding to get the user who ran the command
-    [input]
+  {{{user-id :id username :username} :user} :member guild-id :guild-id}
+  [input]
   (state/info (str "Registered " username " to " input))
   (let [message (register! input user-id guild-id)]
     (graph-debounced!)
@@ -287,56 +353,89 @@
   (-> {:content "Unenrolling all those registered"}
       rsp/channel-message))
 
-(defn send-course-embed [course channel-id]
-  (let [{id :id channel-id :channel-id} @(d-rest/create-message! (:rest @state/state) channel-id :embed (get-course-embed course))]
-    (d-rest/pin-message! (:rest @state/state) channel-id id)
-    (swap! state/course-embeds update course assoc :id id :channel-id channel-id)))
+(defn get-above-threshold
+  "Given the course map, find the course-codes with >= n count"
+  [course-map n]
+  (apply merge
+         (keep (fn [[prefix {courses :courses}]]
+                 (let [above-threshold (keep (fn [[course {c :count}]] (when (>= c n) course)) courses)]
+                   (when (seq above-threshold)
+                     {prefix above-threshold}))) course-map)))
 
-(defn send-course-embeds [course-map]
-  (doseq [[_ {courses :courses}] course-map]
-    (doseq [[course {channel-id :channel-id}] courses]
-      (send-course-embed course channel-id))))
+(defn create-categories!
+  "Create categories for the provided courses
+  courses is map from prefix to course-code"
+  [courses guild-id]
+  (apply merge
+         (map (fn [[prefix _]]
+                {prefix {:parent-id (:id @(create-category! prefix guild-id))}}) courses)))
 
-(defn update-course-embed [course]
-  (let [{id :id channel-id :channel-id} (get @state/course-embeds course)
-        embed (scrapper/yoink-details course)]
-    (swap! state/course-embeds update course assoc :embed embed)
-    (d-rest/edit-message! (:rest @state/state) channel-id id :embed embed)))
+(defn create-roles!
+  "Create roles for the provided courses
+  courses is map from prefix to course-code"
+  [courses guild-id]
+  (apply merge
+         (map (fn [[prefix course-codes]]
+                (->>
+                 (for [course-code course-codes]
+                   [course-code {:role-id (:id @(create-role! course-code guild-id))}])
+                 (into {})
+                 (hash-map :courses)
+                 (hash-map prefix)))
+              courses)))
 
-(defn update-course-embeds [course-map]
-  (doseq [[_ {courses :courses}] course-map]
-    (doseq [[course _] courses]
-      (update-course-embed course))))
+(defn create-channels!
+  "Create channels for the provided courses, allow additional roles and self, block @everyone
+  courses is map from prefix to course-code"
+  [courses course-map additional-roles guild-id]
+  (apply merge
+         (map (fn [[prefix course-codes]]
+                (->>
+                 (for [course-code course-codes
+                      :let [role-id (get-in course-map [prefix :courses course-code :role-id])
+                            parent-id (get-in course-map [prefix :parent-id])]
+                       :when (and role-id parent-id)]
+                  [course-code {:channel-id (:id @(create-channel!
+                                                   course-code
+                                                   parent-id
+                                                   (conj additional-roles role-id)
+                                                   [guild-id]
+                                                   guild-id))}])
+                 (into {})
+                 (hash-map :courses)
+                 (hash-map prefix)))
+                courses)))
 
-(defn deep-merge [a & maps]
-  (if (map? a)
-    (apply merge-with deep-merge a maps)
-    (apply merge-with deep-merge maps)))
+(defn filter-courses [courses course-map f k]
+  (apply merge
+         (keep (fn [[prefix courses]]
+                 (let [filtered-courses
+                       (for [course courses
+                             :when (f course-map prefix course k)]
+                         course)]
+                   (when (seq filtered-courses)
+                     {prefix filtered-courses}))) courses)))
 
 (defn create-roles-and-channels! [course-map n guild-id embeds?]
-  (let [config @state/config]
-    (deep-merge course-map
-                (->>
-                 (for [[prefix {courses :courses parent-id :parent-id}] course-map
-                       :when (some (fn [[_ {c :count}]] (>= c n)) courses)
-                       :let [parent-id (or parent-id (:id @(create-category! prefix guild-id)))]]
-                   [prefix {:parent-id parent-id
-                            :courses (->>
-                                      (for [[k v] courses
-                                            :when (>= (:count v) n)
-                                            :let [role-id (or (get v :role-id) (:id (create-role! k guild-id)))
-                                                  channel-id (or (get v :channel-id)
-                                                                 (:id @(create-channel!
-                                                                        k parent-id
-                                                                        (conj (:additional-roles config) role-id)
-                                                                        [guild-id]
-                                                                        guild-id)))]]
-                                        (do
-                                          (when (and embeds? (:auto-send-embed config))
-                                            (send-course-embed k channel-id))
-                                          [k (assoc v :role-id role-id :channel-id channel-id)]))
-                                      (into {}))}])
-                 (into {})))))
+  (let [courses (get-above-threshold course-map n)
+        filter-fn (fn [course-map prefix course k]
+                    (not (get-in course-map [prefix :courses course k])))
+        
+        categories (create-categories!
+                    (filter-courses
+                     courses course-map
+                     (fn [course-map prefix _ k]
+                       (not (get-in course-map [prefix k]))) :parent-id) guild-id)
+        
+        roles (create-roles! (filter-courses courses course-map filter-fn :role-id) guild-id)
+        course-map (swap! state/course-map deep-merge course-map categories roles)
+        channels (create-channels!
+                  (filter-courses courses course-map filter-fn :channel-id)
+                  course-map (:additional-roles @state/config) guild-id)
+        course-map (swap! state/course-map deep-merge course-map channels)]
+    (when (and embeds? (:auto-send-embed @state/config))
+      (let [embeds (send-course-embeds! course-map)]
+        (swap! state/course-embeds deep-merge embeds)))))
 
 (defn remove-roles-and-channels! [course-map guild-id]
   (->>
@@ -348,7 +447,8 @@
                           (for [[k v] courses]
                             (do
                               (when-let [channel-id (:channel-id v)]
-                                @(d-rest/delete-channel! (:rest @state/state) channel-id))
+                                @(d-rest/delete-channel! (:rest @state/state) channel-id)
+                                (swap! state/course-embeds update k dissoc :id :channel-id))
                               (when-let [role-id (:role-id v)]
                                 @(d-rest/delete-guild-role! (:rest @state/state) guild-id role-id))
                               [k (dissoc v :role-id :channel-id)]))
@@ -357,19 +457,19 @@
 
 (cmd/defhandler create-roles-and-channels
   ["create-roles-and-channels"]
-    {guild-id :guild-id {username :username} :user}
+    {{{username :username} :user} :member guild-id :guild-id}
     [threshold embeds]
   (state/info (str "Creating roles and channels, requested by: " username))
   (future
-    (let [course-map (create-roles-and-channels! @state/course-map threshold guild-id embeds)]
-        (reset! state/course-map course-map)))
+    (create-roles-and-channels! @state/course-map threshold guild-id embeds))
   (->> {:content "Creating roles and channels..."}
       rsp/channel-message))
 
 (cmd/defhandler remove-roles-and-channels
   ["remove-roles-and-channels"]
-  {guild-id :guild-id}
+  {{{username :username} :user} :member guild-id :guild-id}
   _
+  (state/info (str "Removing roles and channels, requested by: " username))
   (future
     (let [course-map (remove-roles-and-channels! @state/course-map guild-id)]
        (reset! state/course-map course-map)))
@@ -382,11 +482,21 @@
   [value]
   (if-let [channel-id (get-in @state/course-map [(subs value 0 4) :courses value :channel-id])]
     (do
-      (future (send-course-embed value channel-id))
+      (future (let [embed (send-course-embed! value channel-id)]
+                (swap! state/course-embeds merge embed)))
       (->> {:content (str "Sending the embed to channel: `" value "`.")}
        rsp/channel-message
        rsp/ephemeral))
     (rsp/channel-message {:content (str "Course `" value "` does not exist in the internal map. Could not find a channel-id.")})))
+
+(cmd/defhandler send-all-embeds
+  ["send-all-embeds"]
+  _
+  _
+  (future (let [embeds (force-send-course-embeds! @state/course-map)]
+            (swap! state/course-embeds deep-merge embeds)))
+  (->> {:content (str "Sending the embeds...")}
+       rsp/channel-message))
 
 (cmd/defhandler update-embeds
   ["update-embeds"]
@@ -510,6 +620,18 @@
            (swap! state/config assoc :auto-send-embed value)
            (str "Set auto-send-embed to " value)))
        (assoc {} :content)
+       rsp/channel-message))
+
+(cmd/defhandler auto-channel-threshold
+  ["auto-channel-threshold"]
+  _
+  [value]
+  (->> (if (nil? value)
+         (str "auto-channel-threshold is currently " (d-format/code (:auto-channel-threshold @state/config)))
+         (let [value (int value)]
+           (swap! state/config assoc :auto-channel-threshold value)
+           (str "Set auto-channel-threshold to " (d-format/code value))))
+       (hash-map :content)
        rsp/channel-message))
 
 (cmd/defhandler override

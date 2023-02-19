@@ -10,6 +10,7 @@
                handler/update-charts)
              (cmd/group ["embed"]
                handler/send-embed
+               handler/send-all-embeds
                handler/update-embeds)
              (cmd/group ["set"]
                handler/image-host-channel
@@ -18,6 +19,7 @@
                handler/auto-enroll
                handler/auto-save
                handler/auto-send-embed
+               handler/auto-channel-threshold
                handler/additional-roles
                handler/remove-additional-roles)
              (cmd/group ["course"]

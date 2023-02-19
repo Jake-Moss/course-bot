@@ -81,6 +81,11 @@
       "Send the embed for the specified course"
       :options
       [(scs/option "value" "Course code" :string :required true)])
+
+     (scs/sub-command
+      "send-all-embeds"
+      "Send the embeds for all courses. Overrides previous embeds **USE WHEN EMBEDS BROKE**")
+
      (scs/sub-command
       "update-embeds"
       "Update all embeds"))
@@ -135,7 +140,13 @@
       "remove-additional-roles"
       "Remove a role to the allowed viewing list when creating channels"
       :options
-      [(scs/option "role" "Role id" :string :required true)]))
+      [(scs/option "role" "Role id" :string :required true)])
+
+     (scs/sub-command
+      "auto-channel-threshold"
+      "Auto create channel and role when threshold is reached. Leave blank to query"
+      :options
+      [(scs/option "value" "threshold" :number)]))
 
 
     (scs/sub-command-group

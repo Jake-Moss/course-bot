@@ -42,9 +42,12 @@
   (reset! state/state (start-bot! (:token @state/config) #{}))
   (reset! state/bot-id (:id @(d-rest/get-current-user! (:rest @state/state))))
   (reset! state/course-map (edn/read-string (slurp (:save-filename @state/config))))
+  (reset! state/course-embeds (edn/read-string (slurp "embeds.edn")))
 
   (add-watch state/course-map :course-map-saver (fn [_ _ _ new] (when (:auto-save @state/config) (state/course-map-debounced! new))))
   (add-watch state/config :config-saver (fn [_ _ _ new] (state/config-debounced! new)))
+  (add-watch state/course-embeds :embed-saver (fn [_ _ _ new] (state/embed-debounced! new)))
+
   (try
     (doseq [{guild-id :id} @(d-rest/get-current-user-guilds! (:rest @state/state))]
      @(d-rest/bulk-overwrite-guild-application-commands! (:rest @state/state) (:application-id @state/config) guild-id commands))

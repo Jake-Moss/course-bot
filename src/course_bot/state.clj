@@ -84,6 +84,9 @@
 
 (def config-debounced! (debounce #(spit "config.edn" (pr-str (dissoc % :token :application-id))) (* 60 1000)))
 
+(def embed-debounced! (debounce #(spit "embeds.edn" (pr-str %)) (* 60 1000)))
+
 (defn save! []
   (spit "config.edn" (pr-str (dissoc @config :token :application-id)))
+  (spit "embeds.edn" (pr-str @course-embeds))
   (spit (:save-filename @config) @course-map))
