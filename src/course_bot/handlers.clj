@@ -150,8 +150,9 @@
               (let [course-map @state/course-map
                     c (:count (get-course course course-map))
                     threshold (:auto-channel-threshold config)
+                    diff (- threshold c)
                     role-id (:role-id (get-course course course-map))
-                    parent-id (:parent-id (get-in course-map [(subs course 0 4) :parent-id]))
+                    parent-id (:parent-id (get course-map (subs course 0 4)))
                     parent-id (if (and (>= c threshold) (not parent-id))
                                 (:id @(create-category! (subs course 0 4) guild-id))
                                 parent-id)
@@ -171,8 +172,8 @@
                     message (if channel-id
                               (str "Registered to " course ", join everyone else in " (d-format/mention-channel channel-id))
                               (str "Registered to " course ", currently not enough "
-                                   "people have registered for this course. Need "
-                                   (- threshold c) " more people. Invite your friends "
+                                   "people have registered for this course to justify a channel. Need " diff
+                                    (if (= diff 1) " more person." " more people.")" Invite your friends "
                                    "to have a channel created!"))
                     message (-> {:content message}
                                 rsp/channel-message
