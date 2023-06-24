@@ -57,49 +57,6 @@
         (swap! state/course-embeds assoc course {:embed embed})
         embed))))
 
-(defn create-category! [name guild-id]
-  (d-rest/create-guild-channel! (:rest @state/state) guild-id name :type 4))
-
-(defn create-role! [name guild-id]
-  (d-rest/create-guild-role! (:rest @state/state) guild-id :name name))
-
-(defn create-channel! [name parent-id viewable-by not-viewable-by guild-id]
-  (d-rest/create-guild-channel!
-   (:rest @state/state) guild-id
-   name :type 0 :parent-id parent-id
-   :permission-overwrites
-   (into []
-         (concat (for [role viewable-by]
-                   {:id role :type :role
-                    :allow (:view-channel d-perms/permissions-bit)})
-                 (for [role not-viewable-by]
-                   {:id role :type :role
-                    :deny (:view-channel d-perms/permissions-bit)})
-                 (list {:id @state/bot-id :type :member :allow (:view-channel d-perms/permissions-bit)})))))
-
-(defn enroll! [course user-id guild-id]
-  (let [role-id (or (get-in @state/course-map [(subs course 0 4) :courses course :role-id])
-                    (:id @(create-role! course guild-id)))]
-    (swap! state/course-map assoc-in [(subs course 0 4) :courses course :role-id] role-id)
-    @(d-rest/add-guild-member-role! (:rest @state/state) guild-id user-id role-id)))
-
-(defn unenroll! [course user-id guild-id]
-  (when-let [role-id (get-in @state/course-map [(subs course 0 4) :courses course :role-id])]
-    @(d-rest/remove-guild-member-role! (:rest @state/state) guild-id user-id role-id)))
-
-(defn enroll-all! [course-map guild-id]
-  (doseq [[_ {courses :courses}] course-map]
-    (doseq [[course {users :users}] courses]
-      (doseq [user-id users]
-        (enroll! course user-id guild-id)))))
-
-(defn unenroll-all! [course-map guild-id]
-  (doseq [[_ {courses :courses}] course-map]
-    (doseq [[course {users :users}] courses]
-      (doseq [user-id users]
-        (unenroll! course user-id guild-id)))))
-
-
 (defn send-course-embed! [course channel-id]
   (let [{id :id channel-id :channel-id} @(d-rest/create-message! (:rest @state/state) channel-id :embed (get-course-embed course))]
     (d-rest/pin-message! (:rest @state/state) channel-id id)
@@ -133,6 +90,55 @@
     (apply merge-with deep-merge a maps)
     (apply merge-with deep-merge maps)))
 
+(defn create-category! [name guild-id]
+  (d-rest/create-guild-channel! (:rest @state/state) guild-id name :type 4))
+
+(defn create-role! [name guild-id]
+  (d-rest/create-guild-role! (:rest @state/state) guild-id :name name))
+
+(defn create-channel! [name parent-id viewable-by not-viewable-by guild-id]
+  (let [channel @(d-rest/create-guild-channel!
+                  (:rest @state/state) guild-id
+                  name :type 0 :parent-id parent-id
+                  :permission-overwrites
+                  (into []
+                        (concat (for [role viewable-by]
+                                  {:id role :type :role
+                                   :allow (:view-channel d-perms/permissions-bit)})
+                                (for [role not-viewable-by]
+                                  {:id role :type :role
+                                   :deny (:view-channel d-perms/permissions-bit)})
+                                (list {:id @state/bot-id :type :member :allow (:view-channel d-perms/permissions-bit)}))))]
+    (when (:auto-send-embed @state/config)
+      (let [id (:id channel)
+            embed (send-course-embed! name id)]
+        (swap! state/course-embeds deep-merge embed)
+        (let [{title :title} (get-course-embed name)]
+          (d-rest/modify-channel! (:rest @state/state) id :topic title))))
+    channel))
+
+(defn enroll! [course user-id guild-id]
+  (let [role-id (or (get-in @state/course-map [(subs course 0 4) :courses course :role-id])
+                    (:id @(create-role! course guild-id)))]
+    (swap! state/course-map assoc-in [(subs course 0 4) :courses course :role-id] role-id)
+    @(d-rest/add-guild-member-role! (:rest @state/state) guild-id user-id role-id)))
+
+(defn unenroll! [course user-id guild-id]
+  (when-let [role-id (get-in @state/course-map [(subs course 0 4) :courses course :role-id])]
+    @(d-rest/remove-guild-member-role! (:rest @state/state) guild-id user-id role-id)))
+
+(defn enroll-all! [course-map guild-id]
+  (doseq [[_ {courses :courses}] course-map]
+    (doseq [[course {users :users}] courses]
+      (doseq [user-id users]
+        (enroll! course user-id guild-id)))))
+
+(defn unenroll-all! [course-map guild-id]
+  (doseq [[_ {courses :courses}] course-map]
+    (doseq [[course {users :users}] courses]
+      (doseq [user-id users]
+        (unenroll! course user-id guild-id)))))
+
 (defn register! [course user-id guild-id]
   (let [course (str/upper-case course)
         config @state/config]
@@ -158,16 +164,13 @@
                                 parent-id)
                     channel-id (:channel-id (get-course course course-map))
                     channel-id (if (and (>= c threshold) (not channel-id))
-                                 (let [channel-id (:id @(create-channel!
-                                                         course
-                                                         parent-id
-                                                         (conj (:additional-roles config) role-id)
-                                                         [guild-id]
-                                                         guild-id))]
-                                 (when (:auto-send-embed @state/config)
-                                   (let [embed (send-course-embed! course channel-id)]
-                                     (swap! state/course-embeds deep-merge embed)))
-                                 channel-id)
+                                 (let [channel-id (:id (create-channel!
+                                                        course
+                                                        parent-id
+                                                        (conj (:additional-roles config) role-id)
+                                                        [guild-id]
+                                                        guild-id))]
+                                   channel-id)
                                  channel-id)
                     message (if channel-id
                               (str "Registered to " course ", join everyone else in " (d-format/mention-channel channel-id))
@@ -396,12 +399,12 @@
                       :let [role-id (get-in course-map [prefix :courses course-code :role-id])
                             parent-id (get-in course-map [prefix :parent-id])]
                        :when (and role-id parent-id)]
-                  [course-code {:channel-id (:id @(create-channel!
-                                                   course-code
-                                                   parent-id
-                                                   (conj additional-roles role-id)
-                                                   [guild-id]
-                                                   guild-id))}])
+                  [course-code {:channel-id (:id (create-channel!
+                                                  course-code
+                                                  parent-id
+                                                  (conj additional-roles role-id)
+                                                  [guild-id]
+                                                  guild-id))}])
                  (into {})
                  (hash-map :courses)
                  (hash-map prefix)))
