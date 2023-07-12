@@ -113,7 +113,7 @@
       (let [id (:id channel)
             embed (send-course-embed! name id)]
         (swap! state/course-embeds deep-merge embed)
-        (let [{title :title} (get-course-embed name)]
+        (let [{title :title} (replace (get-course-embed name) (str "(" name ")") "")]
           (d-rest/modify-channel! (:rest @state/state) id :topic title))))
     channel))
 
