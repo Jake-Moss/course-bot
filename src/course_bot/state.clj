@@ -11,10 +11,7 @@
 
 (def bot-id (atom nil))
 
-(def config (atom
-             (merge
-              (edn/read-string (slurp "config.edn"))
-              (edn/read-string (slurp "token.edn")))))
+(def config (atom {}))
 
 (def course-map (atom {}))
 

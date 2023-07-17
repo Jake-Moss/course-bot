@@ -39,6 +39,9 @@
 
 
 (defn -main [& args]
+  (reset! state/config (merge
+                        (edn/read-string (slurp "config.edn"))
+                        (edn/read-string (slurp "token.edn"))))
   (reset! state/state (start-bot! (:token @state/config) #{}))
   (reset! state/bot-id (:id @(d-rest/get-current-user! (:rest @state/state))))
   (reset! state/course-map (edn/read-string (slurp (:save-filename @state/config))))
