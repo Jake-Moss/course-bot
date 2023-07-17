@@ -15,7 +15,7 @@
 
 (def course-map (atom {}))
 
-(def course-regex (atom (re-pattern (:course-regex @config))))
+(def course-regex (atom {}))
 
 (def course-embeds (atom {}))
 
