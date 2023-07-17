@@ -98,8 +98,10 @@
 (defn create-role! [name guild-id]
   (d-rest/create-guild-role! (:rest @state/state) guild-id :name name))
 
-(defn create-channel! [name parent-id viewable-by not-viewable-by guild-id]
-  (let [channel @(d-rest/create-guild-channel!
+(defn create-channel! [name parent-id role-id additional not-viewable-by guild-id]
+  (let [config @state/config
+        viewable-by (conj additional role-id)
+        channel @(d-rest/create-guild-channel!
                   (:rest @state/state) guild-id
                   name :type 0 :parent-id parent-id
                   :permission-overwrites
@@ -111,12 +113,17 @@
                                   {:id role :type :role
                                    :deny (:view-channel d-perms/permissions-bit)})
                                 (list {:id @state/bot-id :type :member :allow (:view-channel d-perms/permissions-bit)}))))]
-    (when (:auto-send-embed @state/config)
+    (when (:auto-send-embed config)
       (let [id (:id channel)
             embed (send-course-embed! name id)]
         (swap! state/course-embeds deep-merge embed)
         (if-let [{title :title} (get-course-embed name)]
           (d-rest/modify-channel! (:rest @state/state) id :topic (str/replace title (str "(" name ")") "")))))
+    (when (:ping-on-channel-creation config)
+      (d-rest/create-message! (:rest @state/state) (:id channel) :content
+                              (str "Welcome to your new home " (d-format/mention-role role-id) "!")
+                              :allowed-mentions {:roles [role-id]}
+                              :flags (bit-shift-left 1 12))) ;; Silent ping
     channel))
 
 (defn enroll! [course user-id guild-id]
@@ -168,7 +175,8 @@
                                  (let [channel-id (:id (create-channel!
                                                         course
                                                         parent-id
-                                                        (conj (:additional-roles config) role-id)
+                                                        role-id
+                                                        (:additional-roles config)
                                                         [guild-id]
                                                         guild-id))]
                                    channel-id)
@@ -412,7 +420,8 @@
                   [course-code {:channel-id (:id (create-channel!
                                                   course-code
                                                   parent-id
-                                                  (conj additional-roles role-id)
+                                                  role-id
+                                                  additional-roles
                                                   [guild-id]
                                                   guild-id))}])
                  (into {})
@@ -657,6 +666,18 @@
          (do
            (swap! state/config assoc :allow-registration value)
            (str "Set allow-registration to " value)))
+       (hash-map :content)
+       rsp/channel-message))
+
+(cmd/defhandler ping-on-channel-creation
+  ["ping-on-channel-creation"]
+  _
+  [value]
+  (->> (if (nil? value)
+         (str "ping-on-channel-creation is currently " (d-format/code (:ping-on-channel-creation @state/config)))
+         (do
+           (swap! state/config assoc :ping-on-channel-creation value)
+           (str "Set ping-on-channel-creation to " value)))
        (hash-map :content)
        rsp/channel-message))
 

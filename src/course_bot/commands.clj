@@ -152,6 +152,12 @@
       "allow-registration"
       "Enable or disable registration"
       :options
+      [(scs/option "value" "Value. Provide none to query" :boolean)])
+
+     (scs/sub-command
+      "ping-on-channel-creation"
+      "Enable or disable a silent ping on channel creation"
+      :options
       [(scs/option "value" "Value. Provide none to query" :boolean)]))
 
 

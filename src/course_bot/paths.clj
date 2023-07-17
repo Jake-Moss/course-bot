@@ -22,7 +22,8 @@
                handler/auto-channel-threshold
                handler/additional-roles
                handler/remove-additional-roles
-               handler/allow-registration)
+               handler/allow-registration
+               handler/ping-on-channel-creation)
              (cmd/group ["course"]
                handler/set-interest
                handler/force-register

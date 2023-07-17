@@ -14,4 +14,5 @@
   :repl-options {:init-ns course-bot.core}
   :plugins [[lein-cljfmt "0.8.0"]]
   :jvm-opts ["-Dclojure.tools.logging.factory=clojure.tools.logging.impl/slf4j-factory"]
-  :main course-bot.core)
+  :main course-bot.core
+  :aot [course-bot.core])
