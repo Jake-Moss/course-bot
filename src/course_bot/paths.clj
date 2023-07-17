@@ -21,7 +21,8 @@
                handler/auto-send-embed
                handler/auto-channel-threshold
                handler/additional-roles
-               handler/remove-additional-roles)
+               handler/remove-additional-roles
+               handler/allow-registration)
              (cmd/group ["course"]
                handler/set-interest
                handler/force-register

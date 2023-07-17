@@ -58,8 +58,10 @@
         embed))))
 
 (defn send-course-embed! [course channel-id]
-  (let [{id :id channel-id :channel-id} @(d-rest/create-message! (:rest @state/state) channel-id :embed (get-course-embed course))]
-    (d-rest/pin-message! (:rest @state/state) channel-id id)
+  (let [embed (get-course-embed course)
+        {id :id channel-id :channel-id} (when embed @(d-rest/create-message! (:rest @state/state) channel-id :embed embed))]
+    (when (and id channel-id)
+      (d-rest/pin-message! (:rest @state/state) channel-id id))
     {course {:id id :channel-id channel-id}}))
 
 (defn send-course-embeds! [course-map]
@@ -113,8 +115,8 @@
       (let [id (:id channel)
             embed (send-course-embed! name id)]
         (swap! state/course-embeds deep-merge embed)
-        (let [{title :title} (replace (get-course-embed name) (str "(" name ")") "")]
-          (d-rest/modify-channel! (:rest @state/state) id :topic title))))
+        (if-let [{title :title} (get-course-embed name)]
+          (d-rest/modify-channel! (:rest @state/state) id :topic (str/replace title (str "(" name ")") "")))))
     channel))
 
 (defn enroll! [course user-id guild-id]
@@ -156,14 +158,13 @@
               (let [course-map @state/course-map
                     c (:count (get-course course course-map))
                     threshold (:auto-channel-threshold config)
-                    diff (- threshold c)
                     role-id (:role-id (get-course course course-map))
                     parent-id (:parent-id (get course-map (subs course 0 4)))
-                    parent-id (if (and (>= c threshold) (not parent-id))
+                    parent-id (if (and (>= threshold 0) (>= c threshold) (not parent-id))
                                 (:id @(create-category! (subs course 0 4) guild-id))
                                 parent-id)
                     channel-id (:channel-id (get-course course course-map))
-                    channel-id (if (and (>= c threshold) (not channel-id))
+                    channel-id (if (and (>= threshold 0) (>= c threshold) (not channel-id))
                                  (let [channel-id (:id (create-channel!
                                                         course
                                                         parent-id
@@ -174,10 +175,13 @@
                                  channel-id)
                     message (if channel-id
                               (str "Registered to " course ", join everyone else in " (d-format/mention-channel channel-id))
-                              (str "Registered to " course ", currently not enough "
-                                   "people have registered for this course to justify a channel. Need " diff
-                                    (if (= diff 1) " more person." " more people.")" Invite your friends "
-                                   "to have a channel created!"))
+                              (if (>= threshold 0)
+                                (let [diff (- threshold c)]
+                                  (str "Registered to " course ", currently not enough "
+                                       "people have registered for this course to justify a channel. Need " diff
+                                       (if (= diff 1) " more person." " more people.")" Invite your friends "
+                                       "to have a channel created!"))
+                                (str "Registered to " course ", but channels are currently not being created. Don't worry though, they'll be here soon!")))
                     message (-> {:content message}
                                 rsp/channel-message
                                 rsp/ephemeral)]
@@ -235,10 +239,14 @@
   ["register"]
   {{{user-id :id username :username} :user} :member guild-id :guild-id}
   [input]
-  (state/info (str "Registered " username " to " input))
-  (let [message (register! input user-id guild-id)]
-    (graph-debounced!)
-    message))
+  (if (:allow-registration @state/config)
+    (do
+      (state/info (str "Registered " username " to " input))
+      (let [message (register! input user-id guild-id)]
+        (graph-debounced!)
+        message))
+    (-> {:content "Course registration is currently disabled"}
+        rsp/channel-message)))
 
 (cmd/defhandler register-autocomplete
   ["register"]
@@ -635,7 +643,19 @@
          (str "auto-channel-threshold is currently " (d-format/code (:auto-channel-threshold @state/config)))
          (let [value (int value)]
            (swap! state/config assoc :auto-channel-threshold value)
-           (str "Set auto-channel-threshold to " (d-format/code value))))
+           (str "Set auto-channel-threshold to " (d-format/code value) (when (< value 0) ", no channels will be auto created."))))
+       (hash-map :content)
+       rsp/channel-message))
+
+(cmd/defhandler allow-registration
+  ["allow-registration"]
+  _
+  [value]
+  (->> (if (nil? value)
+         (str "allow-registration is currently " (d-format/code (:allow-registration @state/config)))
+         (do
+           (swap! state/config assoc :allow-registration value)
+           (str "Set allow-registration to " value)))
        (hash-map :content)
        rsp/channel-message))
 

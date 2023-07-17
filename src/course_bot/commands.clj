@@ -146,7 +146,13 @@
       "auto-channel-threshold"
       "Auto create channel and role when threshold is reached. Leave blank to query"
       :options
-      [(scs/option "value" "threshold" :number)]))
+      [(scs/option "value" "threshold" :number)])
+
+     (scs/sub-command
+      "allow-registration"
+      "Enable or disable registration"
+      :options
+      [(scs/option "value" "Value. Provide none to query" :boolean)]))
 
 
     (scs/sub-command-group

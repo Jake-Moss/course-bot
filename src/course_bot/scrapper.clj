@@ -14,23 +14,27 @@
   Returns a discord embed object"
   [course-code]
   (let [url (str base-url course-code)
-        html (get-html url)]
-    {:title (first (html/select html [:#course-title html/content]))
-     :description (first (html/select html [:#course-summary html/content]))
-     :url url
-     :color 5814783
-     :author {:name (first (html/select html [:#course-coordinator html/content]))} ;; cc
-     :footer {:text (first (html/select html [:#course-offering-1-sem html/content]))} ;; date
-     :fields ;; Offerings
-     (for [current-offerings (html/select html [:table#course-current-offerings :tbody :tr])]
-       {;; mode
-        :name (first (html/select current-offerings
-                                  [:td.course-offering-mode :a html/content]))
-        ;; profile url
-        :value (or (:href (:attrs
-                           (first (html/select current-offerings
-                                               [:td.course-offering-profile :a]))))
-                   "Profile unavailable")})}))
+        html (get-html url)
+        embed {:title (first (html/select html [:#course-title html/content]))
+               :description (first (html/select html [:#course-summary html/content]))
+               :url url
+               :color 5814783
+               :author {:name (first (html/select html [:#course-coordinator html/content]))} ;; cc
+               :footer {:text (first (html/select html [:#course-offering-1-sem html/content]))} ;; date
+               :fields ;; Offerings
+               (for [current-offerings (html/select html [:table#course-current-offerings :tbody :tr])]
+                 {;; mode
+                  :name (first (html/select current-offerings
+                                            [:td.course-offering-mode :a html/content]))
+                  ;; profile url
+                  :value (or (:href (:attrs
+                                     (first (html/select current-offerings
+                                                         [:td.course-offering-profile :a]))))
+                             "Profile unavailable")})}]
+    (if (and (nil? (:title embed)) (nil? (:description embed)))
+      {:title "No embed found" :description "Are you sure this is a real course? If it is, please ping @rogueportal"}
+      embed)
+    ))
 
 
 (comment
