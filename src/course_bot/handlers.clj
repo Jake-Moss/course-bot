@@ -288,6 +288,7 @@
   _
   _
   (reset! state/course-map {})
+  (reset! state/course-embeds {})
   (-> {:content "Reset all course interests"}
       rsp/channel-message))
 
