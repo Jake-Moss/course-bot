@@ -261,6 +261,7 @@
           (sort-by (comp :count val) >)
           keys
           (filter #(str/starts-with? % input))
+          (remove #(= input %))
           (#(if (empty? input) % (conj % input))) ;; Add user input as first element
           (map #(array-map :name %1, :value %1))
           (into [])))))
