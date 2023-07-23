@@ -35,6 +35,11 @@
                   (map #(cond-> % (rand-nth [true false]) Character/toUpperCase))
                   str/join)}))
 
+
+(defmacro future-with-follow-up [token msg & body]
+  `(future ~@body
+           (d-rest/create-followup-message! (:rest @state/state) @state/bot-id ~token :content ~msg)))
+
 (defn course? [course]
   (boolean (re-matches @state/course-regex course)))
 
@@ -360,18 +365,17 @@
 
 (cmd/defhandler enroll-all
   ["enroll-all"]
-  {guild-id :guild-id}
+  {guild-id :guild-id token :token}
   _
-  (future (enroll-all! @state/course-map guild-id))
-  ;; (enroll-all! @state/course-map guild-id)
+  (future-with-follow-up token "Enrolled all" (enroll-all! @state/course-map guild-id))
   (-> {:content "Enrolling all those registered"}
       rsp/channel-message))
 
 (cmd/defhandler unenroll-all
   ["unenroll-all"]
-  {guild-id :guild-id}
+  {guild-id :guild-id token :token}
   _
-  (future (unenroll-all! @state/course-map guild-id))
+  (future-with-follow-up token "Unenrolled all" (unenroll-all! @state/course-map guild-id))
   (-> {:content "Unenrolling all those registered"}
       rsp/channel-message))
 
@@ -480,20 +484,20 @@
 
 (cmd/defhandler create-roles-and-channels
   ["create-roles-and-channels"]
-    {{{username :username} :user} :member guild-id :guild-id}
+    {{{username :username} :user} :member guild-id :guild-id token :token}
     [threshold embeds]
   (state/info (str "Creating roles and channels, requested by: " username))
-  (future
+  (future-with-follow-up token "Created all roles and channels"
     (create-roles-and-channels! @state/course-map threshold guild-id embeds))
   (->> {:content "Creating roles and channels..."}
       rsp/channel-message))
 
 (cmd/defhandler remove-roles-and-channels
   ["remove-roles-and-channels"]
-  {{{username :username} :user} :member guild-id :guild-id}
+  {{{username :username} :user} :member guild-id :guild-id token :token}
   _
   (state/info (str "Removing roles and channels, requested by: " username))
-  (future
+  (future-with-follow-up token "Removed all roles and channels"
     (let [course-map (remove-roles-and-channels! @state/course-map guild-id)]
        (reset! state/course-map course-map)))
   (->> {:content "Removing roles and channels"}
@@ -501,12 +505,13 @@
 
 (cmd/defhandler send-embed
   ["send-embed"]
-  _
+  {token :token}
   [value]
   (if-let [channel-id (get-in @state/course-map [(subs value 0 4) :courses value :channel-id])]
     (do
-      (future (let [embed (send-course-embed! value channel-id)]
-                (swap! state/course-embeds merge embed)))
+      (future-with-follow-up token "Sent embed"
+                             (let [embed (send-course-embed! value channel-id)]
+                               (swap! state/course-embeds merge embed)))
       (->> {:content (str "Sending the embed to channel: `" value "`.")}
        rsp/channel-message
        rsp/ephemeral))
@@ -514,18 +519,19 @@
 
 (cmd/defhandler send-all-embeds
   ["send-all-embeds"]
+  {token :token}
   _
-  _
-  (future (let [embeds (force-send-course-embeds! @state/course-map)]
-            (swap! state/course-embeds deep-merge embeds)))
+  (future-with-follow-up token "Sent all embeds"
+                         (let [embeds (force-send-course-embeds! @state/course-map)]
+                           (swap! state/course-embeds deep-merge embeds)))
   (->> {:content (str "Sending the embeds...")}
        rsp/channel-message))
 
 (cmd/defhandler update-embeds
   ["update-embeds"]
+  {token :token}
   _
-  _
-  (future (update-course-embeds @state/course-map))
+  (future-with-follow-up token "Updated all embeds" (update-course-embeds @state/course-map))
   (rsp/channel-message {:content "Updating all course embeds..."}))
 
 (cmd/defhandler additional-roles
@@ -601,11 +607,13 @@
        rsp/channel-message
        rsp/ephemeral)))
 
+(future-with-follow-up "demo" "hellow ther" (println "whsdfsldkfj") (println (+ 1 2)))
+
 (cmd/defhandler update-charts
   ["update-charts"]
+  {token :token}
   _
-  _
-  (future (update-charts!))
+  (future-with-follow-up token "Updated charts" (update-charts!))
   (->> {:content "Forcibly updating all charts..."}
        rsp/channel-message))
 
@@ -729,8 +737,9 @@
 
 (cmd/defhandler ping
   ["ping"]
-  _
-  _
+  request
+    _
+  (state/info request)
   (-> (rsp/channel-message {:content "pong"})
       rsp/ephemeral))
 

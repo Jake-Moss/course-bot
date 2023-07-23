@@ -1,5 +1,6 @@
 (ns course-bot.scrapper
-  (:require [net.cgrand.enlive-html :as html])
+  (:require [net.cgrand.enlive-html :as html]
+            [clojure.string :as str])
   (:import java.net.URL))
 
 (def base-url "https://my.uq.edu.au/programs-courses/course.html?course_code=")
@@ -8,6 +9,8 @@
   "A memorised function to retreive html."
   [url]
    (html/html-resource (URL. url)))
+
+(defn now [] (java.util.Date.))
 
 (defn yoink-details
   "Scrap the details of all availiable course offerings from UQ.
@@ -19,17 +22,24 @@
                :description (first (html/select html [:#course-summary html/content]))
                :url url
                :color 5814783
-               :author {:name (first (html/select html [:#course-coordinator html/content]))} ;; cc
-               :footer {:text (first (html/select html [:#course-offering-1-sem html/content]))} ;; date
+               :author {:name (->> (html/select html [:#course-coordinator html/content])
+                                   (take-nth 2)
+                                   (apply str)
+                                   (#(str/replace %1 "\n" " ")))} ;; cc
+               :footer {:text (str "Last updated - " (.toString (now)))} ;; date
                :fields ;; Offerings
                (for [current-offerings (html/select html [:table#course-current-offerings :tbody :tr])]
                  {;; mode
-                  :name (first (html/select current-offerings
-                                            [:td.course-offering-mode :a html/content]))
+                  :name (str
+                         (first (html/select current-offerings [:a.course-offering-year html/content]))
+
+                         )
                   ;; profile url
-                  :value (or (:href (:attrs
-                                     (first (html/select current-offerings
-                                                         [:td.course-offering-profile :a]))))
+                  :value (or (some-> (html/select current-offerings [:td.course-offering-profile :a])
+                                 first
+                                 :attrs
+                                 :href
+                                 (#(str (first (html/select current-offerings [:td.course-offering-mode :a html/content])) ": [Course Profile]" "(" % ")")))
                              "Profile unavailable")})}]
     (if (and (nil? (:title embed)) (nil? (:description embed)))
       {:title "No embed found" :description "Are you sure this is a real course? If it is, please ping @rogueportal"}
