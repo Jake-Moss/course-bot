@@ -41,11 +41,6 @@
              handler/ping
              handler/unknown)
 
-  (cmd/group ["fun"] ; common prefix for all following commands
-             handler/reverse-input
-             handler/mock
-             handler/unknown)
-
   (cmd/group ["course"] ; common prefix for all following commands
              handler/register
              handler/deregister
