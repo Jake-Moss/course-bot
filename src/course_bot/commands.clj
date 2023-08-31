@@ -221,4 +221,4 @@
      "ping"
      "pong the ping.")]))
 
-(def commands [fun-commands course-commands sudo-commands])
+(def commands [course-commands sudo-commands])
