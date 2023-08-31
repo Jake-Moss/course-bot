@@ -15,26 +15,6 @@
             [course-bot.scrapper :as scrapper]
             [course-bot.bar :refer [score-graph]]))
 
-;;; fun
-(cmd/defhandler reverse-input
-  ["reverse-input"]
-  _
-  [input words]
-  (rsp/channel-message
-   {:content (if words
-               (->> #"\s+" (str/split input) str/reverse (str/join " "))
-               (str/reverse input))}))
-
-(cmd/defhandler mock
-  ["mock"]
-  _
-  [input]
-  (rsp/channel-message
-   {:content (->> input
-                  (str/lower-case)
-                  (map #(cond-> % (rand-nth [true false]) Character/toUpperCase))
-                  str/join)}))
-
 
 (defmacro future-with-follow-up [token msg & body]
   `(future ~@body
