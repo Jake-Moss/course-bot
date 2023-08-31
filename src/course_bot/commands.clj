@@ -21,24 +21,6 @@
    :default_member_permissions default-member-permissions
    :type (some-> type scs/command-types)))
 
-(def fun-commands
-  (command
-   "fun"
-   "Fun commands"
-   :default-member-permissions (d-perms/permission-int '(:send-messages))
-   :options
-   [(scs/sub-command
-     "reverse-input"
-     "Reverse the input"
-     :options
-     [input-option
-      (scs/option "words" "Reverse words instead of characters?" :boolean)])
-    (scs/sub-command
-     "mock"
-     "Spongebob-mock the input"
-     :options
-     [input-option])]))
-
 (def course-commands
   (command
    "course"
