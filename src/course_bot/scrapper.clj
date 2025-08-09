@@ -5,10 +5,27 @@
 
 (def base-url "https://my.uq.edu.au/programs-courses/course.html?course_code=")
 
+(def default-user-agent
+  "CourseBot (+jake<hypehn>moss<zero><at-sign>proton<dot>me)")
+
+(def default-headers
+  {"User-Agent"      default-user-agent
+   "From"            "jake<hypehn>moss<zero><at-sign>proton<dot>me"
+   "Accept"          "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+   "Accept-Language" "en-AU,en;q=0.9"})
+
 (defn get-html
-  "A memorised function to retreive html."
   [url]
-   (html/html-resource (URL. url)))
+  (let [u (URL. url)
+        conn (.openConnection u)]
+    (doseq [[k v] default-headers]
+      (.setRequestProperty conn k v))
+    ;; Reasonable timeouts (ms) to avoid hanging threads.
+    (.setConnectTimeout conn 10000)
+    (.setReadTimeout conn 10000)
+    (with-open [in (.getInputStream conn)]
+      ;; Parse directly from the stream.
+      (html/html-resource (java.io.InputStreamReader. in "UTF-8")))))
 
 (defn now [] (java.util.Date.))
 
